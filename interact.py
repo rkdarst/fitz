@@ -21,7 +21,7 @@ scrollback = 20
 line_continuers = (",", "\\")
 tab = "        "
 
-def interact(banner="", local=None):
+def interact(banner="", local=None, stackLevel=1):
     """Interact using the current global and local scope and history.
 
     arguments:
@@ -31,7 +31,7 @@ def interact(banner="", local=None):
     if len(banner) > 0:
         print banner
     # Get data from calling frame
-    calling_data = inspect.stack()[1]
+    calling_data = inspect.stack()[stackLevel]
     #print calling_data
     filename = calling_data[1]
     lineno   = calling_data[2]
