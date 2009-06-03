@@ -13,6 +13,25 @@ def cartesianproduct(*args):
             for xs in cartesian_product_mrgreen2(*args[1:]):
                 yield (x,) + xs
 
+def chooseNEnumerate(objs, number=1):
+    """Iterator over all posibilities of choosing `number` of `objs`
+
+    This *exhaustively lists* all options, not providing overall
+    statistics.
+    """
+    # by Richard Darst
+    if number == 0:
+        yield ()
+        return
+
+    for i, obj in enumerate(objs):
+        otherobjs = objs[:i] + objs[i+1:]
+        #print " current", obj, otherobjs
+        for conditional_selections in chooseNEnumerate(otherobjs, number-1):
+            #print " others", conditional_selections
+            yield ( obj, ) + conditional_selections
+
+
 
 class Averager(object):
     """Numerically Stable Averager
