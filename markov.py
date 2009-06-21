@@ -1,0 +1,199 @@
+# Richard Darst, June 2009
+
+from fitz import irclogparser
+import random
+import re
+import string
+import sys
+
+validChars = string.ascii_letters + string.digits
+reInalidChars = re.compile("[^"+validChars+"]+")
+reValidChars = re.compile("["+validChars+"]+")
+reAllValidChars = re.compile("["+validChars+"]+$")
+def sanitize_word(word):
+    #words = reInvalidChars.split(word)
+    #newword = ''
+    #for w in words
+    return reInalidChars.sub('', word)
+#def sanitize_word(word):
+#    if len(word) > 15:
+#        return ''
+#    if reAllValidChars.match(word):
+#        return word
+#    return ''
+
+debug = False
+
+commonWords = set('''to the it that a is and of in do be have for
+so are but on was like if or they would not with at as well more
+with not dont'''.split())
+
+class Person(object):
+    def __init__(self, nick):
+        self.nick = nick
+        self.wordCounts = { }
+        self.markovArray = { }
+    def __iadd__(self, (line, ) ):
+        recentWords = ('', '')
+        #recentWords = (hash(''), hash(''))
+        line = line.split()
+        if len(line) < 5:
+            return self
+        for word in line:
+            word = sanitize_word(word)
+            if word == '':
+                continue
+            word = word.lower()
+            # simple word counts
+            self.wordCounts.setdefault(word, 0)
+            self.wordCounts[word] += 1
+            # markov chain:
+            #if recentWords not in self.markovArray:
+            #    self.markovArray[recentWords] = { }
+            #self.markovArray.setdefault(recentWords, {})
+            #self.markovArray[recentWords].setdefault(word, 0)
+            self.markovArray.setdefault(recentWords, {}).setdefault(word, 0)
+            #self.markovArray[recentWords]
+            self.markovArray[recentWords][word] += 1
+            #print self.markovArray
+            # update recent words
+            recentWords = recentWords[1:] + (word, )
+            #recentWords = recentWords[1:] + (hash(word), )
+
+    def topWords(self):
+        topWords = sorted(((c,w) for w,c in self.wordCounts.iteritems()),
+                          reverse=True)
+        topWords = [(w,c) for c,w in topWords if w not in commonWords]
+
+        return topWords
+
+    def genSentence(self, length=10, counts=False):
+        markovArray = self.markovArray
+        sentence = [ ]
+        debugsentence = [ ]
+        recentWords = ('', '')
+        #recentWords = (hash(''), hash(''))
+        while length:
+            if debug:
+                print recentWords, len(markovArray.get(recentWords, ()))
+            countdata = ""
+            if recentWords in markovArray:
+                selection = markovArray[recentWords]
+            elif ('',) + recentWords[1:] in markovArray:
+            #elif (hash(''),) + recentWords[1:] in markovArray:
+                if debug:
+                    print "    not found:", recentWords
+                    print "    going to:", ('',) + recentWords[1:]
+                countdata += '(1)'
+                selection = markovArray[('',) + recentWords[1:]]
+                #selection = markovArray[(hash(''),) + recentWords[1:]]
+            #elif ('',) + recentWords[:-1] in markovArray:
+            #    print "not found:", recentWords
+            #    selection = markovArray[('',) + recentWords[1:]]
+            else:
+                if debug:
+                    print '    restarting, not found:', recentWords
+                    print '    going to:', ('', '')
+                countdata += '(r)'
+                selection = markovArray[('', '')]
+                #selection = markovArray[(hash(''), hash(''))]
+            totalNumber = sum(value for value in selection.itervalues())
+            #print "  totalNumber", totalNumber
+            choice = random.uniform(0, totalNumber)
+            countdata += "(%d/%d)"%(len(selection), totalNumber)
+            for w, c in selection.iteritems():
+                choice -= c
+                if choice <= 0:
+                    next = w
+                    break
+            sentence.append(next)
+            debugsentence.append(next+countdata)
+            recentWords = recentWords[1:] + (next, )
+            #recentWords = recentWords[1:] + (hash(next), )
+
+            length -= 1
+        if counts:
+            return sentence, debugsentence
+        else:
+            return sentence
+            #raise None
+
+
+
+def loadChannel(f, nicks=None, storage=None):
+    parser = irclogparser.LogParser(f)
+
+    if storage is None:
+        AllNicks = { }
+    else:
+        AllNicks = storage
+    for msgtype, nick, line, parser in parser:
+        #if parser.totallines > 10000: break
+        if msgtype not in ('msg', ):
+            continue
+        if nick[-1] == '_':
+            nick = nick[:-1]
+        lowernick = nick.lower()
+        if nicks and lowernick not in nicks:
+            continue
+        if lowernick not in AllNicks:
+            #AllNicks[nick] = {'wordCounts':{},
+            #                  'markovArray':{}}
+            AllNicks[lowernick] = Person(nick)
+        NickData = AllNicks[lowernick]
+        NickData += (line, )
+        #line = line.split()
+        #for word in line:
+        #    word = sanitize_word(word)
+        #    NickData['wordCounts'].setdefault(word, 0)
+        #    NickData['wordCounts'][word] += 1
+    return AllNicks
+
+def printTopWords(people, number=None):
+    topWords = [person.topWords() for person in people]
+    maxlen = max(len(x) for x in topWords)
+    print ("%-15s "*len(people))%tuple(p.nick for p in people)
+    row_i = -1
+    while True:
+        row_i += 1
+        for person_i in range(len(people)):
+            top = topWords[person_i]
+            if len(top) > row_i:
+                print "%5d:%-9s"%(top[row_i][1], top[row_i][0]),
+            else:
+                print " "*15,
+        print
+        if number and row_i >= number:
+            break
+        if row_i >= maxlen:
+            break
+
+def topDigraphs(person):
+     x = sorted(
+         [ (sum([count for next,count in nextarray.iteritems()]), recent)
+           for (recent, nextarray) in person.markovArray.iteritems()
+                 if recent[0] != ''])
+
+
+if __name__ == "__main__":
+    debug = True
+    AllNicks = loadChannel(open(sys.argv[1]))
+    allsent = [ ]
+    for i in range(20):
+        allsent.append(" ".join(AllNicks['mrbeige'].genSentence()))
+    for s in allsent:
+        print s
+
+
+#printTopWords((AllNicks['MrBeige'],
+#               AllNicks['MrMauve'],
+#               AllNicks['MrBlonde'],
+#               AllNicks['mssnowflake'],
+#               AllNicks['Hydroxide'],
+#              ), number=None)
+#printTopWords((AllNicks['MrBeige'],
+#               AllNicks['Hydroxide'],
+#               AllNicks['moray'],
+#               AllNicks['h01ger'],
+#               AllNicks['marga'],
+#              ), number=None)
