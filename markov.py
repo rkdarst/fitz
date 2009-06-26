@@ -10,17 +10,21 @@ validChars = string.ascii_letters + string.digits
 reInalidChars = re.compile("[^"+validChars+"]+")
 reValidChars = re.compile("["+validChars+"]+")
 reAllValidChars = re.compile("["+validChars+"]+$")
-def sanitize_word(word):
-    #words = reInvalidChars.split(word)
-    #newword = ''
-    #for w in words
-    return reInalidChars.sub('', word)
 #def sanitize_word(word):
 #    if len(word) > 15:
 #        return ''
 #    if reAllValidChars.match(word):
 #        return word
 #    return ''
+def sanitize_word(word):
+    return word
+
+    #def sanitize_word(self, word):
+    #    #words = reInvalidChars.split(word)
+    #    #newword = ''
+    #    #for w in words
+    #    return reInalidChars.sub('', word)
+
 
 debug = False
 
@@ -29,17 +33,21 @@ so are but on was like if or they would not with at as well more
 with not dont'''.split())
 
 class Person(object):
+    #recentWords = ('', '')
+    #split_func = re.compile(r'\s+').split
+    #join_char = " "
+    recentWords = ('', '', '', '', '')
+    split_func = lambda self, x: (y for y in x)
+    join_char = ""
     def __init__(self, nick):
         self.nick = nick
         self.wordCounts = { }
         self.markovArray = { }
     def __iadd__(self, (line, ) ):
-        recentWords = ('', '')
-        #recentWords = (hash(''), hash(''))
-        line = line.split()
-        if len(line) < 5:
+        recentWords = self.recentWords
+        if len(line) < 15:
             return self
-        for word in line:
+        for word in self.split_func(line):
             word = sanitize_word(word)
             if word == '':
                 continue
@@ -59,6 +67,11 @@ class Person(object):
             # update recent words
             recentWords = recentWords[1:] + (word, )
             #recentWords = recentWords[1:] + (hash(word), )
+        # End of line.
+        word = ''
+        self.markovArray.setdefault(recentWords, {}).setdefault(word, 0)
+        self.markovArray[recentWords][word] += 1
+
 
     def topWords(self):
         topWords = sorted(((c,w) for w,c in self.wordCounts.iteritems()),
@@ -67,36 +80,36 @@ class Person(object):
 
         return topWords
 
-    def genSentence(self, length=10, counts=False):
+    def genSentence(self, length=10, counts=False, debugsent=None):
         markovArray = self.markovArray
         sentence = [ ]
         debugsentence = [ ]
-        recentWords = ('', '')
+        recentWords = self.recentWords
         #recentWords = (hash(''), hash(''))
-        while length:
+        while True:
             if debug:
                 print recentWords, len(markovArray.get(recentWords, ()))
             countdata = ""
             if recentWords in markovArray:
                 selection = markovArray[recentWords]
-            elif ('',) + recentWords[1:] in markovArray:
-            #elif (hash(''),) + recentWords[1:] in markovArray:
-                if debug:
-                    print "    not found:", recentWords
-                    print "    going to:", ('',) + recentWords[1:]
-                countdata += '(1)'
-                selection = markovArray[('',) + recentWords[1:]]
-                #selection = markovArray[(hash(''),) + recentWords[1:]]
-            #elif ('',) + recentWords[:-1] in markovArray:
-            #    print "not found:", recentWords
+            #elif ('',) + recentWords[1:] in markovArray:
+            ##elif (hash(''),) + recentWords[1:] in markovArray:
+            #    if debug:
+            #        print "    not found:", recentWords
+            #        print "    going to:", ('',) + recentWords[1:]
+            #    countdata += '(1)'
             #    selection = markovArray[('',) + recentWords[1:]]
-            else:
-                if debug:
-                    print '    restarting, not found:', recentWords
-                    print '    going to:', ('', '')
-                countdata += '(r)'
-                selection = markovArray[('', '')]
-                #selection = markovArray[(hash(''), hash(''))]
+            #    #selection = markovArray[(hash(''),) + recentWords[1:]]
+            ##elif ('',) + recentWords[:-1] in markovArray:
+            ##    print "not found:", recentWords
+            ##    selection = markovArray[('',) + recentWords[1:]]
+            #else:
+            #    if debug:
+            #        print '    restarting, not found:', recentWords
+            #        print '    going to:', ('', '')
+            #    countdata += '(r)'
+            #    selection = markovArray[('', '')]
+            #    #selection = markovArray[(hash(''), hash(''))]
             totalNumber = sum(value for value in selection.itervalues())
             #print "  totalNumber", totalNumber
             choice = random.uniform(0, totalNumber)
@@ -111,11 +124,18 @@ class Person(object):
             recentWords = recentWords[1:] + (next, )
             #recentWords = recentWords[1:] + (hash(next), )
 
-            length -= 1
+            if length:
+                length -= 1
+                if length == 0:
+                    break
+            else:
+                if next == '':
+                    break
+                
         if counts:
-            return sentence, debugsentence
-        else:
-            return sentence
+            debugsent.append(self.join_char.join(debugsentence))
+        return self.join_char.join(sentence)
+        #return self.join_char.join(debugsentence)
             #raise None
 
 
@@ -180,7 +200,7 @@ if __name__ == "__main__":
     AllNicks = loadChannel(open(sys.argv[1]))
     allsent = [ ]
     for i in range(20):
-        allsent.append(" ".join(AllNicks['mrbeige'].genSentence()))
+        allsent.append(AllNicks['mrbeige'].genSentence(length=None))
     for s in allsent:
         print s
 
