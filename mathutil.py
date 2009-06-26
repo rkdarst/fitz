@@ -1,5 +1,6 @@
 # Richard Darst, May 2009
 
+import math
 
 def cartesianproduct(*args):
     """Cartesian product of iteratables given as arguments.
@@ -65,16 +66,20 @@ class Averager(object):
     @property
     def std(self):
         """Population Variance"""
+        if self.n == 0: return float('nan')
         return math.sqrt(self._M2 / self.n)
     @property
     def stdsample(self):
         """Sample Variance"""
+        if self.n <= 1: return float('nan')
         return math.sqrt(self._M2 / (self.n-1))
     @property
     def var(self):
         """Population Standard Deviation"""
+        if self.n == 0: return float('nan')
         return self._M2 / self.n
     @property
     def varsample(self):
         """Sample Standard Deviation"""
+        if self.n <= 1: return float('nan')
         return self._M2 / (self.n-1)
