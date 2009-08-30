@@ -1,5 +1,6 @@
 '''fitz.misc - various useful (but unrelated) one-off functions and classes
 '''
+import os
 import os.path
 
 
@@ -170,3 +171,36 @@ class AtomicFileWriter(file):
         if not self._close_has_been_called:
             os.rename(self.initial_path, self.final_path)
             self._close_has_been_called = True
+
+
+def dependency(target, *prereqs):
+    """decorator for creating makefile-like lazily-evaluated rules
+
+    Typical usage might be something like this:
+
+    from fitz.misc import dependency
+    @dependency('index.html', 'blog-entries.xml', 'blog-entries-index.xsl',
+                'blog-entries-template.xsl')
+    def _(outfile, xmlfile, xsltfile, *rest):
+        spawn_process('xsltproc', '--xinclude', '--output', outfile,
+                      xsltfile, xmlfile)
+
+    The first argument to dependency() is a filename that the rule is
+    responsible for creating or updating, called the target. The *rest of
+    the arguments are files that the target depends upon. If any of them
+    are newer than the target (according to mtime) or if the target doesn't
+    even exist yet, then the decorated function is called. Otherwise,
+    everything is assumed to be up-to-date and the decorated function is
+    never called.
+    """
+    def check_dependency(creator_func):
+        if os.path.exists(target):
+            target_mtime = os.stat(target).st_mtime
+            for prereq in prereqs:
+                if target_mtime < os.stat(prereq).st_mtime:
+                    break
+            else:
+                return
+        print 'creating %s' % target
+        creator_func(target, *prereqs)
+    return check_dependency
