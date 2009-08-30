@@ -2,6 +2,10 @@
 '''
 import os
 import os.path
+import logging
+
+
+log = logging.getLogger('fitz')
 
 
 def assert_directory_exists(path):
@@ -200,7 +204,8 @@ def dependency(target, *prereqs):
                 if target_mtime < os.stat(prereq).st_mtime:
                     break
             else:
+                log.debug('target is up-to-date: %s' % target)
                 return
-        print 'creating %s' % target
+        log.info('creating target %s' % target)
         creator_func(target, *prereqs)
     return check_dependency
