@@ -1,4 +1,5 @@
 # Richard Darst, May 2009
+# David M. Creswick, Sept 2009
 
 import math
 
@@ -83,3 +84,52 @@ class Averager(object):
         """Sample Standard Deviation"""
         if self.n <= 1: return float('nan')
         return self._M2 / (self.n-1)
+
+def extended_euclidean_algorithm(a, b):
+    """given integers a and b , I return the tuple (x, y, gcd(a,b))
+    such that x*a + y*b = gcd(a,b)
+
+    Generally speaking, the algorithm should work over any principal
+    ideal domain, so you can probably pass any pair of python object
+    that act like members of a principal ideal domain.
+
+    """
+    q, r = divmod(a,b)
+    if r == 0:
+        return 0, 1, b
+    else:
+        x, y, gcd = extended_euclidean_algorithm(b, r)
+        return y, (x-y*q), gcd
+
+def gcd(a, b):
+    '''finds greatest common denominator of a and b
+    '''
+    _, _, gcd = extended_euclidean_algorithm(a,b)
+    return gcd
+
+def product(seq):
+    it = iter(seq)
+    x = it.next()
+    for y in it:
+        x *= y
+    return x
+
+def chinese_remainder_algorithm(congruences):
+    '''Chinese remainder algorithm
+
+    Given a list of (n_i, a_i) tuples, this function finds an integer
+    x such that x mod n_i = a_i for all n_i, a_i in the list of
+    congruences.
+
+    eg, chinese_remainder_algorithm([(3,2),(4,3),(5,1)]) returns 11
+    because 11 mod 3 is 2, 11 mod 4 is 3, and 11 mod 5 is 1
+
+    '''
+    N = product([n for n,_ in congruences])
+    c = 0
+    for n,a in congruences:
+        _, y, gcd = extended_euclidean_algorithm(n, N/n)
+        assert gcd == 1
+        e = y*N/n
+        c += a*e
+    return c % N
