@@ -93,6 +93,29 @@ def extended_euclidean_algorithm(a, b):
     ideal domain, so you can probably pass any pair of python object
     that act like members of a principal ideal domain.
 
+
+    Proof of correctness:
+    The division algorithm asserts existence of integers q and r so
+    that 0 <= r < b and
+    
+    (1)  a = q*b + r.
+    
+    If r == 0, then b divides a exactly, thus b is the gcd of a and
+    b. Obviously x=0 and y=1. So assume r != 0. Run the extended
+    euclidean algorithm on b and r to find integers x' and y' such
+    that
+
+    (2) x'*b + y'*r = gcd(b,r).
+
+    This recursion will eventually terminate becase 0 <= r < b, so at
+    every iteration, it is being applied to a pair of numbers that are
+    strictly smaller than before.  Multiply eqn (1) by y' and
+    substitute into (2) for y'*r to get
+
+    y'*a + (x' - y'*q)*b = gcd(b,r).
+
+    Due to eqn (1), gcd(b,r) = gcd(a,b). x = y' and y = x' - y'*q.
+
     """
     q, r = divmod(a,b)
     if r == 0:
@@ -115,16 +138,30 @@ def product(seq):
     return x
 
 def chinese_remainder_algorithm(congruences):
-    '''Chinese remainder algorithm
+    """Chinese remainder algorithm
 
-    Given a list of (n_i, a_i) tuples, this function finds an integer
-    x such that x mod n_i = a_i for all n_i, a_i in the list of
-    congruences.
+    Given a list of (n_i, a_i) tuples where the n_i are all pairwise
+    coprime, this function finds an integer x such that x mod n_i =
+    a_i for all n_i, a_i in the list of congruences.
 
     eg, chinese_remainder_algorithm([(3,2),(4,3),(5,1)]) returns 11
     because 11 mod 3 is 2, 11 mod 4 is 3, and 11 mod 5 is 1
 
-    '''
+    Proof of correctness:
+    If you have a collection of integers e_i that have the property that
+    e_i mod n_j = 0 for i != j and e_i mod n_j = 1 for i = j, then
+    (a_1*e_1 + a_2*e_2 + ... + a_k*e_k) mod n_i = a_i for all i.
+    So the myster number x is (a_1*e_1 + a_2*e_2 + ... + a_k*e_k).
+    Now we just have to construct e_i that have those properties.
+    Define N = n_1*n_2*...*n_k. Then N is divisible by n_i and N/n_i
+    is relatively prime to n_i (because remember n_i is relatively
+    prime to n_j for all i != j). The Euclidean algorithm can be
+    used to find integers x and y so that x*n_i + y*N/n_i = 1. From
+    this equation, you can tell that (y*N/n_i) mod n_i = 1. Since N/n_i
+    has every n_j as a factor except n_i, (y*N/n_i) mod n_j = 0 for j != 1.
+    We have found the e_i we needed, specifically, e_i = y*N/n_i.
+
+    """
     N = product([n for n,_ in congruences])
     c = 0
     for n,a in congruences:
