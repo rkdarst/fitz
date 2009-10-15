@@ -84,8 +84,20 @@ class LogParser(object):
 
 
 if __name__ == "__main__":
-    parser = LogParser(open(sys.argv[1]))
-    for msg, nick, line, LP in parser:
-        #print msg.upper(), nick, line
-        pass
+    if sys.argv[1] == 'nickcount':
+        files = sys.argv[2:]
+        import collections
+        nick_list = collections.defaultdict(int)
+        for fname in files:
+            parser = LogParser(open(fname))
+            for msg, nick, line, LP in parser:
+                nick_list[nick] += 1
+        for k,v in sorted(nick_list.iteritems(), key=lambda x: x[1]):
+            print k, v
+
+    else:
+        parser = LogParser(open(sys.argv[1]))
+        for msg, nick, line, LP in parser:
+            #print msg.upper(), nick, line
+            pass
 
