@@ -101,20 +101,23 @@ def extended_euclidean_algorithm(a, b):
     (1)  a = q*b + r.
     
     If r == 0, then b divides a exactly, thus b is the gcd of a and
-    b. Obviously x=0 and y=1. So assume r != 0. Run the extended
+    b. Obviously x=0 and y=1. This handles the base case for the
+    induction argument. So now assume r != 0 and run the extended
     euclidean algorithm on b and r to find integers x' and y' such
     that
 
     (2) x'*b + y'*r = gcd(b,r).
 
-    This recursion will eventually terminate becase 0 <= r < b, so at
-    every iteration, it is being applied to a pair of numbers that are
-    strictly smaller than before.  Multiply eqn (1) by y' and
-    substitute into (2) for y'*r to get
+    The recursive application of the euclidean algorithm will
+    eventually terminate becase 0 <= r < b, so at every iteration it
+    is being applied to a pair of numbers that are strictly smaller
+    than before.  Multiply eqn (1) by y' and substitute into (2) for
+    y'*r to get
 
     y'*a + (x' - y'*q)*b = gcd(b,r).
 
-    Due to eqn (1), gcd(b,r) = gcd(a,b). x = y' and y = x' - y'*q.
+    Due to eqn (1), gcd(b,r) = gcd(a,b). So the coefficients are
+    x = y' and y = x' - y'*q.
 
     """
     q, r = divmod(a,b)
@@ -151,7 +154,7 @@ def chinese_remainder_algorithm(congruences):
     If you have a collection of integers e_i that have the property that
     e_i mod n_j = 0 for i != j and e_i mod n_j = 1 for i = j, then
     (a_1*e_1 + a_2*e_2 + ... + a_k*e_k) mod n_i = a_i for all i.
-    So the myster number x is (a_1*e_1 + a_2*e_2 + ... + a_k*e_k).
+    So the mystery number x is (a_1*e_1 + a_2*e_2 + ... + a_k*e_k).
     Now we just have to construct e_i that have those properties.
     Define N = n_1*n_2*...*n_k. Then N is divisible by n_i and N/n_i
     is relatively prime to n_i (because remember n_i is relatively
