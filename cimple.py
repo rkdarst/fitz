@@ -55,7 +55,7 @@ class Cimple:
             f = open(srcpath,'w')
             f.write('\n\n'.join(source_code))
             f.close()
-            cc.compile([srcfile], extra_postarg=['-fPIC'])
+            cc.compile([srcfile], extra_postargs=['-fPIC'])
             cc.link_shared_lib([objfile], libname)
 
             self.library = ctypes.CDLL(libpath)
@@ -110,8 +110,13 @@ def ctypes_obj_to_raw_c_code(type):
         return 'void'
     if isinstance(type, ctypes.Structure): # XXX this is wrong. type won't be an instance of Structure, it will be a class
         return 'struct '+type.__name__
-    if isinstance(type, ctypes._Pointer): # XXX untested
-        return '(%s)*' % ctypes_obj_to_raw_c_code(type._type_)
+    #if isinstance(type, ctypes._Pointer): # XXX untested
+    #print type.__name__
+    if type.__name__[:3] == 'LP_':
+        inner_type = ctypes_obj_to_raw_c_code(type._type_)
+        if inner_type[-1] == '*': return '%s*'  %inner_type
+        else:                     return '(%s*)'%inner_type
+    raise Exception('Type not known: %r'%type)
 
 class CimpleFunc:
     def __init__(self, func, restype=None):
