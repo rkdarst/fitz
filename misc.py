@@ -209,3 +209,53 @@ def dependency(target, *prereqs):
         log.info('creating target %s' % target)
         creator_func(target, *prereqs)
     return check_dependency
+
+
+def grepfile(filename, pattern, outfilename=None):
+    """'grep' the file for the given pattern.
+
+    This is a simple module to emulate the bash shell utility 'grep'.  The
+    pattern should be a regular expression in the 're' module syntax, as it
+    will be compiled with said module.  An outputfile for the result may
+    optionally be specified.
+
+    """
+    lines = []
+    if outfilename:
+        fout = open(outfilename,'w')
+    find = re.compile(pattern).search
+    for line in file(filename):
+        if find(line):
+            if outfilename:
+                fout.write(line)
+            else:
+                lines.append(line)
+    if outfilename:
+        fout.close()
+    return lines
+
+
+def find(arg,dirname,files):
+    """callback function for os.path.walk() to emulate Unix's 'find' utility.
+    """
+    for filename in files:
+        if arg in filename:
+            print dirname+filename
+
+
+def load_column(fname, col_num, comment_symbols=['#','@']):
+    """Load the data from the column 'colnum' from the data file 'fname' into a
+    1d array and return it, ignoring lines with the comment_symbol.
+
+    """
+    lines = file(fname).read().strip().split('\n')
+    data_lst = []
+    for line in lines:
+        if line[0] not in comment_symbols:
+            try:
+                data_lst.append(float(line.split()[col_num]))
+            except:
+                pass
+    data = np.array(data_lst)
+
+    return data

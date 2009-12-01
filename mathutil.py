@@ -173,3 +173,27 @@ def chinese_remainder_algorithm(congruences):
         e = y*N/n
         c += a*e
     return c % N
+
+
+def fact(x):
+    """return the factorial of x"""
+    return (1 if x==0 else x * fact(x-1))
+
+
+def perm(l):
+    """Generate all permuations of a list"""
+    sz = len(l)
+    if sz <= 1:
+        return [l]
+    return [p[:i]+[l[0]]+p[i:] for i in xrange(sz) for p in perm(l[1:])]
+
+
+def geometric_dist(lower, upper, n):
+    """Return 'n' numbers distributed geometrically between
+    lower and upper.
+    """
+    const = 1.0/float(n-1.0)*np.log(float(upper)/float(lower))
+    temps = np.zeros(n,dtype=float)
+    for i in xrange(n): temps[i] = lower*np.exp(i*const)
+
+    return temps
