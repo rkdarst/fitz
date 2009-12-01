@@ -34,6 +34,13 @@ class LogParser(object):
         self._assertOnErrors = assertOnErrors
 
     def __iter__(self):
+        """
+
+        (msg, nick, line, self)
+
+        <msg> = string indicating message type.  Currently parsed
+                types are 'msg', 'action', 'topic'
+        """
         for line in self.f:
             self.totallines += 1
             m = reLogOpen.match(line)
