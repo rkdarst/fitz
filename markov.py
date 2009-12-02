@@ -19,11 +19,11 @@ reAllValidChars = re.compile("["+validChars+"]+$")
 def sanitize_word(word):
     return word
 
-    #def sanitize_word(self, word):
-    #    #words = reInvalidChars.split(word)
-    #    #newword = ''
-    #    #for w in words
-    #    return reInalidChars.sub('', word)
+def sanitize_word(word):
+    #words = reInvalidChars.split(word)
+    #newword = ''
+    #for w in words
+    return reInalidChars.sub('', word)
 
 
 debug = False
@@ -31,21 +31,23 @@ debug = False
 commonWords = set('''to the it that a is and of in do be have for
 so are but on was like if or they would not with at as well more
 with not dont'''.split())
+commonWords = set(('',))
 
 class Person(object):
     #recentWords = ('', '')
-    #split_func = re.compile(r'\s+').split
-    #join_char = " "
+    split_func = re.compile(r'\s+').split
+    join_char = " "
     recentWords = ('', '', '', '', '')
-    split_func = lambda self, x: (y for y in x)
-    join_char = ""
+    #recentWords = '\0\0\0\0\0'
+    #split_func = lambda self, x: (y for y in x)
+    #join_char = ""
     def __init__(self, nick):
         self.nick = nick
         self.wordCounts = { }
         self.markovArray = { }
     def __iadd__(self, (line, ) ):
         recentWords = self.recentWords
-        if len(line) < 15:
+        if len(line) < 15 or 'http://' in line or 'UghBot' in line:
             return self
         for word in self.split_func(line):
             word = sanitize_word(word)
@@ -66,6 +68,7 @@ class Person(object):
             #print self.markovArray
             # update recent words
             recentWords = recentWords[1:] + (word, )
+            #recentWords = recentWords[1:] + word
             #recentWords = recentWords[1:] + (hash(word), )
         # End of line.
         word = ''
@@ -121,7 +124,8 @@ class Person(object):
                     break
             sentence.append(next)
             debugsentence.append(next+countdata)
-            recentWords = recentWords[1:] + (next, )
+            #recentWords = recentWords[1:] + (next, )
+            recentWords = recentWords[1:] + next
             #recentWords = recentWords[1:] + (hash(next), )
 
             if length:
@@ -138,6 +142,8 @@ class Person(object):
         #return self.join_char.join(debugsentence)
             #raise None
 
+import collections
+lines = collections.defaultdict(int)
 
 
 def loadChannel(f, nicks=None, storage=None):
@@ -154,6 +160,10 @@ def loadChannel(f, nicks=None, storage=None):
         if nick[-1] == '_':
             nick = nick[:-1]
         lowernick = nick.lower()
+
+        lines[sanitize_word(line.lower())] += 1
+        continue
+
         if nicks and lowernick not in nicks:
             continue
         if lowernick not in AllNicks:
@@ -198,19 +208,33 @@ def topDigraphs(person):
 if __name__ == "__main__":
     debug = True
     AllNicks = loadChannel(open(sys.argv[1]))
-    allsent = [ ]
-    for i in range(20):
-        allsent.append(AllNicks['mrbeige'].genSentence(length=None))
-    for s in allsent:
-        print s
+    #allsent = [ ]
+    #for i in range(20):
+    #    allsent.append(AllNicks['mrbeige'].genSentence(length=None))
+    #for s in allsent:
+    #    print s
+
+    if False:
+        printTopWords((AllNicks['mrbeige'],
+                       AllNicks['mrmauve'],
+                       AllNicks['mrblonde'],
+                       AllNicks['mrcyan'],
+                       AllNicks['mssnowflake'],
+                       AllNicks['hydroxide'],
+                       ), number=5000)
+    if True:
+        items = sorted(((v,k) for k,v in lines.iteritems() if v>1),
+                          reverse=True)
+        print "total lines duplicated:", sum(v for v,k in items)
+        print "total lines duplicated > 10:", sum(v for v,k in items if v>10)
+        print "total lines duplicated > 100:", sum(v for v,k in items if v>100)
+        print "unique duplicated lines:", len(items)
+        print "lines total:", sum(v for k,v in lines.iteritems())
+        print
+        for v,k in items:
+            print "%3d"%v, k
 
 
-#printTopWords((AllNicks['MrBeige'],
-#               AllNicks['MrMauve'],
-#               AllNicks['MrBlonde'],
-#               AllNicks['mssnowflake'],
-#               AllNicks['Hydroxide'],
-#              ), number=None)
 #printTopWords((AllNicks['MrBeige'],
 #               AllNicks['Hydroxide'],
 #               AllNicks['moray'],
