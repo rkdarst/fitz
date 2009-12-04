@@ -8,6 +8,7 @@
 
 import code
 import inspect
+import os
 import sys
 
 # Set up readline.  Perhaps this will interact with other things badly
@@ -38,6 +39,19 @@ def interact(banner="", local=None, stackLevel=1):
     local = calling_data[0].f_locals
     global_ = calling_data[0].f_globals
 
+    new_history = [ ]
+    if os.access(filename, os.R_OK):
+        new_history.extend(get_history(filename, lineno))
+    # add lines to history, removing proper amount of whitespace
+    for line in new_history:
+        readline.add_history(line)
+
+    # add an exit() function under the name __exit.  Hopefully this
+    # won't cause namespace collisions!
+    local["__exit"] = sys.exit
+    interact2(local=local, global_=global_, banner="")
+
+def get_history(filename, lineno):
     # get lines
     f = file(filename)
     lines = f.readlines()
@@ -49,9 +63,9 @@ def interact(banner="", local=None, stackLevel=1):
 
     # Get just the lines we want
     if lineno-scrollback >= 0:
-        lines = lines[lineno-scrollback:lineno]
+        lines = lines[lineno-scrollback:lineno-1]
     else:
-        lines = lines[0:lineno]
+        lines = lines[0:lineno-1]
     # Reconstruct list of lines, taking into account wrapping
     newlines = [ ]
     curline = ""
@@ -77,20 +91,15 @@ def interact(banner="", local=None, stackLevel=1):
             newlines.append("".join((curline, line)))
             curline = ""
             continuation = False
-        
-    # add lines to history, removing proper amount of whitespace
-    for line in newlines:
+    # Strip leading whitespace
+    for i, line in enumerate(newlines):
         if len(line[:whitespace].strip()) == 0:
             # if it starts with just whitespace
-            readline.add_history(line.rstrip()[whitespace:])
+            newlines[i] = line.rstrip()[whitespace:]
         else:
             # we need less whitespace here
-            readline.add_history(line.rstrip())
-
-    # add an exit() function under the name __exit.  Hopefully this
-    # won't cause namespace collisions!
-    local["__exit"] = sys.exit
-    interact2(local=local, global_=global_, banner="")
+            newlines[i] = line.strip()
+    return newlines
 
 def null_function(a, b):
     pass
