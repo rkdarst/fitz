@@ -88,24 +88,32 @@ dovideo=True
 x264path = "/home/richard/sys/x264/x264"
 mencoderpath = "/home/richard/sys/MPlayer-1.0rc1/mencoder"
 
+#
+# Useful mpencoder keys:
+#
+# v - Toggle subtitle visibility.
+# j - Cycle through the available subtitles.
+
+
 
 #
 # Function Definitions
 #
 
 def maketmpnames(var):
+    basename = var["input"].replace("://","") # for dvd:// -type names
     audio = var["audio"]
     for i, a in enumerate(audio):
         a["newindex"] = i
-        a["audiofname"] = "tmp."+var["input"]+".audio."+str(a['aid'])+".ogg"
-        audiopipe = 'tmp.'+var['input']+'.audio.'+str(a['aid'])+'.pipe.wav'
+        a["audiofname"] = "tmp."+basename+".audio."+str(a['aid'])+".ogg"
+        audiopipe = 'tmp.'+basename+'.audio.'+str(a['aid'])+'.pipe.wav'
         a['audiopipe'] = audiopipe
 
-    videopipe = "tmp."+var["input"]+".video.pipe.raw"
+    videopipe = "tmp."+basename+".video.pipe.raw"
     var["videopipe"] = videopipe
-    videotmp = "tmp."+var["input"]+".video.mkv"
+    videotmp = "tmp."+basename+".video.mkv"
     var["videotmp"] = videotmp
-
+    var["x264log"] = basename+".x264_2pass.log"
 
 def audioencode(var):
     # This function uses variables from the outside scope to command it.
@@ -178,11 +186,16 @@ def dovideo(var):
         
     #if var.has_key("mplayeropts"):
     #    mencoder[1:1] = var["mplayeropts"]
+    # check aspect for x264
+    aspect = var["aspect"]
+    aspect.replace("/", ":")
+    if aspect.find(':') == -1:
+        aspect = "1:"+aspect   # does this make sense?  it should be w:h
     x264 = [x264path,
             #"--progress",
-            "--stats", "tmp."+var["input"]+".x264_2pass.log",
+            "--stats", "tmp."+var["x264log"],
             videopipe, var["xysize"], "--fps", var["fps"],
-            "--sar", var["aspect"],
+            "--sar", aspect,
             "--verbose"]
 
     if "x264opts_both" in var:
@@ -315,10 +328,10 @@ var['audio'] = audio
 
 
 # Individual pieces (for testing):
-# mencode2.maketmpnames(var)
-# mencode2.doaudio(var)
-# mencode2.dovideo(var)
-# mencode2.merge(var)
+#mencode2.maketmpnames(var)
+#mencode2.doaudio(var)
+#mencode2.dovideo(var)
+#mencode2.merge(var)
 
 # All at once (calls the function above in sequence):
 mencode2.doall(var)
