@@ -2,6 +2,7 @@
 # David M. Creswick, Sept 2009
 
 import math
+import numpy as np
 
 def cartesianproduct(*args):
     """Cartesian product of iteratables given as arguments.
@@ -197,3 +198,16 @@ def geometric_dist(lower, upper, n):
     for i in xrange(n): temps[i] = lower*np.exp(i*const)
 
     return temps
+
+
+def nball_random_surface_point(ndims, radius=1.):
+    """
+    Uniformly randomly generate a point on the surface of the
+    n-ball.
+
+    """
+    x = np.random.randn(ndims)
+    r = np.sqrt((x**2.).sum())
+    s = 1./r * x
+
+    return radius * s
