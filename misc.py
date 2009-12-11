@@ -3,7 +3,7 @@
 import os
 import os.path
 import logging
-
+import numpy as np
 
 log = logging.getLogger('fitz')
 
