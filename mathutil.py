@@ -13,7 +13,7 @@ def cartesianproduct(*args):
         yield ()
     else:
         for x in args[0]:
-            for xs in cartesian_product_mrgreen2(*args[1:]):
+            for xs in cartesianproduct(*args[1:]):
                 yield (x,) + xs
 
 def chooseNEnumerate(objs, number=1):
