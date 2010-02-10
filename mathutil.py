@@ -2,6 +2,7 @@
 # David M. Creswick, Sept 2009
 
 import math
+import numpy
 import numpy as np
 
 def cartesianproduct(*args):
@@ -211,3 +212,52 @@ def nball_random_surface_point(ndims, radius=1.):
     s = 1./r * x
 
     return radius * s
+
+
+def fit(x, # array of x-values
+        y, # array of y-values
+        function,  # f(x, params) -> y
+        initial, # numpy array of initial guess
+        weights=None,
+        **fmin_args):
+    """Simple automatic fit function
+
+    x           - vector of x-values
+    y           - vector of y-values
+    function    - function to be called as
+                  function(x_vector, params) -> returns vector (shape y_vector)
+    initial     - initial guess for fit.  The number of paramaters is taken
+                  from the length of this vector.
+    weights     - a vector, same dimensions the y_vector, if given, weight
+                  the deviances from the y_vector by this.
+    **fmin_args - other arguments to scipy.optimize.fmin
+
+    Sample:
+
+    >>> x = numpy.array((0, 1, 2, 3, 4))
+    >>> y = numpy.array((4, 1, 0, 1, 4))
+    >>> function = lambda x, params: params[0] + params[1]*x + params[2]*x**2
+    >>> initial = (0, 0, 0)
+    >>> fit(x, y, function, initial)
+    array([ 3.9999733 , -3.99996282,  0.9999921 ])
+    >>> fit(x, y, function, initial, xtol=1e-10)
+    array([ 4., -4.,  1.])
+    """
+    import scipy.optimize
+    if weights:
+        def optimizeFunc(params):
+            new = function(x, params)
+            error = (y - new)**2
+            error = numpy.sum(error*weights)
+            return error
+    else:
+        def optimizeFunc(params):
+            new = function(x, params)
+            error = (y - new)**2
+            error = numpy.sum(error)
+            return error
+    xopt = scipy.optimize.fmin(optimizeFunc, initial,
+                               disp=False,
+                               **fmin_args
+                               )
+    return xopt
