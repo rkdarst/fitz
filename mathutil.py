@@ -3,6 +3,7 @@
 
 import math
 import numpy
+import numpy.linalg
 import numpy as np
 
 def cartesianproduct(*args):
@@ -299,11 +300,3 @@ def fit_simplex(x, # array of x-values
                                **fmin_args
                                )
     return xopt
-
-
-if __name__ == "__main__":
-    x = numpy.array((0, 1, 2, 3, 4))
-    y = numpy.array((4, 1, 0, 1, 4))
-    function = lambda x, params: params[0] + params[1]*x + params[2]*x**2
-    initial = (4, -4, 1)
-    print fit(x, y, function, initial)
