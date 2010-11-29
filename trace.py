@@ -82,13 +82,23 @@ if __name__ == "__main__":
     #print sys.argv
     while True:
         # Disable color
-        if sys.argv[1] == '-c':
+        if sys.argv[1] == '-h':
+            print "trace options:"
+            print " -a  trace all lines, not just call/returns"
+            print " -c  do NOT use colors in traces"
+            print " -h  show this help"
+            print " -m  like `-m` flag for python, e.g. "\
+                                         "`python -m fitz.trace -m pdb <args>`"
+            del sys.argv[1]
+            sys.exit()
+        elif sys.argv[1] == '-c':
             useColor = False
             del sys.argv[1]
         elif sys.argv[1] == '-a':
             traceLine = True
             del sys.argv[1]
-        break
+        else:
+            break
     if len(sys.argv) == 1:
         import code
         enable()
