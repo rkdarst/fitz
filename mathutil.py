@@ -218,6 +218,44 @@ def fit(x, # array of x-values
         y, # array of y-values
         function,  # f(x, params) -> y
         initial, # numpy array of initial guess
+        **leastsq_args):
+    """Simple automatic fit function
+
+    x           - vector of x-values
+    y           - vector of y-values
+    function    - function to be called as
+                  function(x_vector, params) -> returns vector (shape y_vector)
+    initial     - initial guess for fit.  The number of paramaters is taken
+                  from the length of this vector.
+    weights     - a vector, same dimensions the y_vector, if given, weight
+                  the deviances from the y_vector by this.
+    **kwargs    - other arguments to scipy.optimize.leastsq
+
+    Sample:
+
+    >>> x = numpy.array((0, 1, 2, 3, 4))
+    >>> y = numpy.array((4, 1, 0, 1, 4))
+    >>> function = lambda x, params: params[0] + params[1]*x + params[2]*x**2
+    >>> initial = (0, 0, 0)
+    >>> fit(x, y, function, initial)
+    array([ 3.9999733 , -3.99996282,  0.9999921 ])
+    """
+    import scipy.optimize
+    def optimizeFunc(params):
+        new = function(x, params)
+        errors = new - y
+        return errors
+    xopt, cov_x, infodict, mesg, errflag = \
+          scipy.optimize.leastsq(optimizeFunc, initial,
+                                 full_output=True, **leastsq_args)
+    #print cov_x
+    return xopt
+
+
+def fit_simplex(x, # array of x-values
+        y, # array of y-values
+        function,  # f(x, params) -> y
+        initial, # numpy array of initial guess
         weights=None,
         **fmin_args):
     """Simple automatic fit function
@@ -261,3 +299,11 @@ def fit(x, # array of x-values
                                **fmin_args
                                )
     return xopt
+
+
+if __name__ == "__main__":
+    x = numpy.array((0, 1, 2, 3, 4))
+    y = numpy.array((4, 1, 0, 1, 4))
+    function = lambda x, params: params[0] + params[1]*x + params[2]*x**2
+    initial = (4, -4, 1)
+    print fit(x, y, function, initial)
