@@ -307,41 +307,41 @@ def polyfitw(x, y, w, ndegree, return_fit=0):
    Performs a weighted least-squares polynomial fit with optional error estimates.
 
    Inputs:
-      x: 
+      x:
          The independent variable vector.
 
-      y: 
-         The dependent variable vector.  This vector should be the same 
+      y:
+         The dependent variable vector.  This vector should be the same
          length as X.
 
-      w: 
-         The vector of weights.  This vector should be same length as 
+      w:
+         The vector of weights.  This vector should be same length as
          X and Y.
 
-      ndegree: 
+      ndegree:
          The degree of polynomial to fit.
 
    Outputs:
       If return_fit==0 (the default) then polyfitw returns only C, a vector of 
       coefficients of length ndegree+1.
       If return_fit!=0 then polyfitw returns a tuple (c, yfit, yband, sigma, a)
-         yfit:  
+         yfit:
             The vector of calculated Y's.  Has an error of + or - Yband.
 
-         yband: 
+         yband:
             Error estimate for each point = 1 sigma.
 
-         sigma: 
+         sigma:
             The standard deviation in Y units.
 
-         a: 
+         a:
             Correlation matrix of the coefficients.
 
    Written by:   George Lawrence, LASP, University of Colorado,
                  December, 1981 in IDL.
                  Weights added, April, 1987,  G. Lawrence
-                 Fixed bug with checking number of params, November, 1998, 
-                 Mark Rivers.  
+                 Fixed bug with checking number of params, November, 1998,
+                 Mark Rivers.
                  Python version, May 2002, Mark Rivers
                  NumPy update, February 2010, John R. Dowdle
    """
@@ -387,7 +387,7 @@ def polyfitw(x, y, w, ndegree, return_fit=0):
 
 def linear_leastsq(x, y, full_output=False):
     """find least-squares fit to y = ax + b
-    
+
     inputs:
         x            sequence of independent variable data
         y            sequence of dependent variable data
@@ -432,9 +432,9 @@ def linear_leastsq(x, y, full_output=False):
 
     a = SSxy/SSxx
     ap = SSxy/SSyy
-    
+
     b = mean_y - a*mean_x
-    
+
     if not full_output:
         return a, b
 
@@ -445,7 +445,7 @@ def linear_leastsq(x, y, full_output=False):
 
     SEb = s*math.sqrt( 1/n + mean_x**2/SSxx )
     SEa = s/math.sqrt(SSxx)
-    
+
     stats = dict(
         r2 = a*ap,      # correlation coefficient
         var_x = SSxx/n, # variance of x (sigma**2)
@@ -458,7 +458,7 @@ def linear_leastsq(x, y, full_output=False):
         ap = ap,        # a' in: x = b' + a'y
         bp = bp,        # b' in: x = b' + a'y
         )
-    
+
     return stats
 
 
