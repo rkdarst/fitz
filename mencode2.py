@@ -140,9 +140,9 @@ def audioencode(var):
     os.spawnvp(os.P_NOWAIT, mencoderpath, mencoder)
     os.spawnvp(os.P_WAIT, "oggenc", oggenc)
 
-# 
+#
 # audio part
-# 
+#
 def doaudio(var):
     audio = var["audio"]
     for i, a in enumerate(audio):
@@ -157,9 +157,9 @@ def doaudio(var):
         audioencode(var2)
         os.system("rm "+a["audiopipe"])
 
-# 
+#
 # Video Part
-#    
+#
 def dovideo(var):
     # This copy below isn't needed if the audio copies from above are left over
     print "****Beginning video stuff"
@@ -169,7 +169,7 @@ def dovideo(var):
     videopipe = var["videopipe"]
     videotmp = var["videotmp"]
     os.system("mkfifo "+videopipe)
-    
+
     mencoder = [mencoderpath,
                 #"-quiet",
                 "-oac", "copy", "-ovc", "raw", "-of", "rawvideo",
@@ -183,7 +183,7 @@ def dovideo(var):
         mencoder[1:1] = ["-vf", "dsize=-1,format=I420"]
     if "mencoderopts" in var:
         mencoder[1:1] = var["mencoderopts"]
-        
+
     #if var.has_key("mplayeropts"):
     #    mencoder[1:1] = var["mplayeropts"]
     # check aspect for x264
@@ -226,29 +226,29 @@ def dovideo(var):
     else:
         x264_pass1 = x264[:]
         x264_pass2 = x264[:]
-    
+
         x264_pass1[1:1] = ["--pass", "1"]
         x264_pass1[1:1] = ["-o", "/dev/null"]
         if "x264opts_pass1" in var:
             x264_pass2[1:1] = var["x264opts_pass1"]
-    
+
         x264_pass2[1:1] = ["--pass", "2"]
         x264_pass2[1:1] = ["-o", videotmp]
         if "x264opts_pass2" in var:
             x264_pass2[1:1] = var["x264opts_pass2"]
-    
+
         print "****Beginning pass 1"
         os.spawnvp(os.P_NOWAIT, mencoderpath, mencoder)
         os.spawnvp(os.P_WAIT, x264path, x264_pass1)
-    
+
         print "****Beginning pass 2"
         os.spawnvp(os.P_NOWAIT, mencoderpath, mencoder)
         os.spawnvp(os.P_WAIT, x264path, x264_pass2)
 
     print "****Done with video encoding"
     os.system("rm "+videopipe)
-    
-    
+
+
 def merge(var):
     print "****Merging..."
     audio = var["audio"]
@@ -283,7 +283,7 @@ def doall(var):
     doaudio(var)
     dovideo(var)
     merge(var)
-    
+
 if __name__ == "__main__":
     doall(var)
 
