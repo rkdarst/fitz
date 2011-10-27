@@ -1,6 +1,7 @@
 # Richard Darst, May 2009
 # David M. Creswick, Sept 2009
 
+import collections
 import math
 import numpy
 import numpy.linalg
@@ -542,6 +543,39 @@ def linear_leastsq(x, y, full_output=False):
         )
 
     return stats
+
+def extrema(input, halfwidth=2):
+    """Find local extrema
+
+    halfwidth: 
+
+    """
+    from scipy.ndimage.filters import generic_filter
+    from scipy.ndimage import extrema
+    """Return all local maxima/minima."""
+    minima = collections.defaultdict(int)
+    maxima = collections.defaultdict(int)
+    inputLength = len(input)-1
+    #i = [ 0 ]
+    def f(array, il):
+        i = il[0]
+        # This function returns (mini, maxi), the indexes of the max
+        # and min of the array.  They return the *lowest* possible
+        # such indexes, thus the max(0, ...) below.
+        min_, max_, mini, maxi = extrema(array)
+        #print array, (min_, max_, mini, maxi), mini[0]+i-halfwidth, maxi[0]+i-halfwidth
+        minima[max(0, mini[0]+i-halfwidth)] += 1
+        maxima[       maxi[0]+i-halfwidth ] += 1
+        il[0] += 1
+        return 0
+    #from fitz import interactnow
+    generic_filter(input, f, size=2*halfwidth+1, mode='nearest',
+                   extra_arguments=([0],) )
+    return list(sorted(k for k,v in minima.items() if v > (halfwidth))), \
+           list(sorted(k for k,v in maxima.items() if v > (halfwidth)))
+
+def _extrema_test():
+    pass
 
 
 if __name__ == "__main__":
