@@ -18,6 +18,7 @@ def cartesianproduct(*args):
             for xs in cartesianproduct(*args[1:]):
                 yield (x,) + xs
 
+# FIXME: this is actually permutations.
 def chooseNEnumerate(objs, number=1):
     """Iterator over all posibilities of choosing `number` of `objs`
 
@@ -32,10 +33,9 @@ def chooseNEnumerate(objs, number=1):
     for i, obj in enumerate(objs):
         otherobjs = objs[:i] + objs[i+1:]
         #print " current", obj, otherobjs
-        for conditional_selections in chooseNEnumerate(otherobjs, number-1):
+        for conditional_selections in permuteNEnumerate(otherobjs, number-1):
             #print " others", conditional_selections
             yield ( obj, ) + conditional_selections
-
 
 
 class Averager(object):
@@ -45,48 +45,130 @@ class Averager(object):
 
     From the 'On-Line Algorithm' from
     http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
+
+    The optional initialization argument datatype= should be a
+    generator function which returns zeros of the type being averaged.
+    For example, to average numpy arrays of ten values, use:
+      Averager(datatype=lambda: numpy.zeros(10))
     """
-    def __init__(self):
-        self.n       = 0
-        self._mean    = 0.   # mean
-        self._M2     = 0.   # variance accumulator
-        #self._var_n  = 0.
-        #self._var_n1 = 0.
+    def __init__(self, datatype=float):
+        self._n      = 0
+        self._mean   = datatype()   # mean
+        self._M2     = datatype()   # variance accumulator
+    def __setstate__(self, state):
+        if 'n' in state:
+            state['_n'] = state['n']
+            del state['n']
+        self.__dict__.update(state)
     def add(self, value):
         """Add a new number to the dataset.
         """
+        if isinstance(value, Averager):
+            # Add a sub-averager
+            return self._add_child(value)
         n = self.n + 1
         delta = value - self._mean
         mean = self._mean + delta/n
         M2 = self._M2 + delta*(value - mean)
-        self.n = n
+        self._n = n
         self._mean = mean
         self._M2 = M2
+        return self
+    __iadd__ = add
 
+    def _add_child(self, child):
+        if hasattr(self, "_child"):
+            self._child.add(child)
+        else:
+            self._child = child
+        return self
+
+    @property
+    def n(self):
+        """Number of points"""
+        if hasattr(self, "_child"):
+            return self._n + self._child.n
+        return self._n
     @property
     def mean(self):
         """Mean"""
+        if hasattr(self, "_child"):
+            #if self._n > 1e3 and self._child.n > 1e3:
+            #    # Large value one
+            #    return (self._n*self._mean + self._child.n*self._child.mean) /\
+            #           (self._n + self._child.n)
+
+            delta = self._child.mean - self._mean
+            return self._mean + delta * self._child.n/(self._n+self._child.n)
         return self._mean
+    @property
+    def M2(self):
+        """M2 algorithm parameter"""
+        if hasattr(self, "_child"):
+            delta = self._child.mean - self._mean
+            return self._M2 + self._child.M2 + \
+                   delta**2 * (self._n*self._child.n)/(self._n+self._child.n)
+        return self._M2
     @property
     def std(self):
         """Population Variance"""
         if self.n == 0: return float('nan')
-        return math.sqrt(self._M2 / self.n)
+        return math.sqrt(self.M2 / self.n)
     @property
     def stdsample(self):
         """Sample Variance"""
         if self.n <= 1: return float('nan')
-        return math.sqrt(self._M2 / (self.n-1))
+        return math.sqrt(self.M2 / (self.n-1))
     @property
     def var(self):
         """Population Standard Deviation"""
         if self.n == 0: return float('nan')
-        return self._M2 / self.n
+        return self.M2 / self.n
     @property
     def varsample(self):
         """Sample Standard Deviation"""
         if self.n <= 1: return float('nan')
-        return self._M2 / (self.n-1)
+        return self.M2 / (self.n-1)
+
+def _test_Averager():
+    import random
+    random.seed(13)
+    rand = lambda : random.uniform(0, 10)
+    a  = Averager()
+    a_stack = [ ]
+    for i in range(10):
+        a_ = Averager()
+        v1 = [ rand() for _ in range(100000) ]
+        [ a.add(x)  for x in v1 ]
+        [ a_.add(x) for x in v1 ]
+        a_stack.append(a_)
+    a1 = a_stack[0]
+    for i in range(1, len(a_stack)):
+        a_stack[i-1].add(a_stack[i])
+
+    #a1 = Averager()
+    #a2 = Averager()
+    #a3 = Averager()
+    #v1 = [ rand() for _ in range(10) ]
+    #v2 = [ rand() for _ in range(10) ]
+    #v3 = [ rand() for _ in range(10) ]
+    #
+    #[ a.add(x)  for x in v1 ]
+    #[ a.add(x)  for x in v2 ]
+    #[ a.add(x)  for x in v3 ]
+    #[ a1.add(x)  for x in v1 ]
+    #[ a2.add(x)  for x in v2 ]
+    #[ a3.add(x)  for x in v3 ]
+    #
+    #a1.add(a2)
+    #a2.add(a3)
+
+    print a.mean, a1.mean, a.mean - a1.mean
+    print a.M2,   a1.M2,   a.M2   - a1.M2
+    print a.std,  a1.std,  a.std  - a1.std
+    assert a.mean == a1.mean
+    assert a.M2   == a1.M2
+    assert a.std  == a1.std
 
 def extended_euclidean_algorithm(a, b):
     """given integers a and b , I return the tuple (x, y, gcd(a,b))
@@ -469,3 +551,4 @@ if __name__ == "__main__":
     initial = (4, -4, 1)
     print fit(x, y, function, initial)
 
+    _test_Averager()
