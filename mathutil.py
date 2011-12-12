@@ -544,11 +544,13 @@ def linear_leastsq(x, y, full_output=False):
 
     return stats
 
-def extrema(input, halfwidth=2):
+def extrema(input, halfwidth=2, excludeedges=False):
     """Find local extrema
 
     halfwidth: 
 
+
+    Returns two lists (minima, maxima)
     """
     from scipy.ndimage.filters import generic_filter
     from scipy.ndimage import extrema
@@ -571,6 +573,9 @@ def extrema(input, halfwidth=2):
     #from fitz import interactnow
     generic_filter(input, f, size=2*halfwidth+1, mode='nearest',
                    extra_arguments=([0],) )
+    if excludeedges:
+        minima.pop(0, None) ; minima.pop(len(input)-1, None)
+        maxima.pop(0, None) ; maxima.pop(len(input)-1, None)
     return list(sorted(k for k,v in minima.items() if v > (halfwidth))), \
            list(sorted(k for k,v in maxima.items() if v > (halfwidth)))
 
