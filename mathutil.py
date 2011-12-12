@@ -383,6 +383,177 @@ def fit_simplex(x, # array of x-values
                                **fmin_args
                                )
     return xopt
+v v v v v v v
+
+
+def polyfitw(x, y, w, ndegree, return_fit=0):
+   """
+   Performs a weighted least-squares polynomial fit with optional error estimates.
+
+   Inputs:
+      x: 
+         The independent variable vector.
+
+      y: 
+         The dependent variable vector.  This vector should be the same 
+         length as X.
+
+      w: 
+         The vector of weights.  This vector should be same length as 
+         X and Y.
+
+      ndegree: 
+         The degree of polynomial to fit.
+
+   Outputs:
+      If return_fit==0 (the default) then polyfitw returns only C, a vector of 
+      coefficients of length ndegree+1.
+      If return_fit!=0 then polyfitw returns a tuple (c, yfit, yband, sigma, a)
+         yfit:  
+            The vector of calculated Y's.  Has an error of + or - Yband.
+
+         yband: 
+            Error estimate for each point = 1 sigma.
+
+         sigma: 
+            The standard deviation in Y units.
+
+         a: 
+            Correlation matrix of the coefficients.
+
+   Written by:   George Lawrence, LASP, University of Colorado,
+                 December, 1981 in IDL.
+                 Weights added, April, 1987,  G. Lawrence
+                 Fixed bug with checking number of params, November, 1998, 
+                 Mark Rivers.  
+                 Python version, May 2002, Mark Rivers
+                 NumPy update, February 2010, John R. Dowdle
+   """
+   n = min(len(x), len(y))               # size = smaller of x,y
+   m = ndegree + 1                       # number of elements in coeff vector
+   a = np.zeros((m,m))                   # least square matrix, weighted matrix
+   b = np.zeros(m)                       # will contain sum w*y*x^j
+   z = np.ones(n)                        # basis vector for constant term
+
+   a[0,0] = np.sum(w)
+   b[0] = np.sum(w*y)
+
+   for p in xrange(1, 2*ndegree+1):         # power loop
+      z = z*x                               # z is now x^p
+      if (p < m):  b[p] = np.sum(w*y*z)     # b is sum w*y*x^j
+      wzsum = np.sum(w*z)
+      for j in xrange(max(0,(p-ndegree)), min(ndegree,p)+1):
+         a[j,p-j] = wzsum
+
+   a = np.linalg.inv(a)
+   c = np.dot(b, a)
+   if (return_fit == 0):                 # exit if only fit coefficients are wanted
+      return c[::-1]                     # reverse c to correspond to numpy's polyfit
+
+   # compute optional output parameters.
+   yfit = np.zeros(n)+c[0]               # one-sigma error estimates, init
+   for k in xrange(1, ndegree +1):
+      yfit = yfit + c[k]*(x**k)          # sum basis vectors
+   var = np.sum((yfit-y)**2 )/(n-m)      # variance estimate, unbiased
+   sigma = np.sqrt(var)
+   yband = np.zeros(n) + a[0,0]
+   z = np.ones(n)
+   for p in xrange(1,2*ndegree+1):           # compute correlated error estimates on y
+      z = z*x		                     # z is now x^p
+      asum = 0.
+      for j in xrange(max(0, (p - ndegree)), min(ndegree, p)+1):
+         asum += + a[j,p-j]
+      yband = yband + asum * z               # add in all the error sources
+   yband = yband*var
+   yband = np.sqrt(yband)
+   return c[::-1], yfit, yband, sigma, a
+
+
+def linear_leastsq(x, y, full_output=False):
+    """find least-squares fit to y = ax + b
+    
+    inputs:
+        x            sequence of independent variable data
+        y            sequence of dependent variable data
+        full_output  (optional) return dictionary of all results and stats
+
+    outputs (not using full_output):
+        a      coeffecient (slope) of regression line
+        b      y intercept of regression line
+
+    full output (using full_output):
+        stats  dictionary containing statistics on fit
+            key   value
+            ---   -----------------------
+            a     a in: y = ax + b
+            b     a in: y = ax + b
+            ap    a' in: x = b' + a'y
+            bp    b' in: x = b' + a'y
+            r2    correlation coeffecient
+            var_x variance of x (sigma**2)
+            var_y variance of y (sigma**2)
+            cov   covariance
+            SEa   standard error for a
+            SEb   standard error for b
+    """
+    # see
+    # http://mathworld.wolfram.com/CorrelationCoefficient.html
+    # and http://mathworld.wolfram.com/LeastSquaresFitting.html
+
+    x = np.asarray(x)
+    y = np.asarray(y)
+    n = len(x)
+    assert n == len(y)
+    mean_x = np.sum(x.astype(np.float64))/n
+    mean_y = np.sum(y.astype(np.float64))/n
+
+    SSxx = np.sum( (x-mean_x)**2 )
+    SSyy = np.sum( (y-mean_y)**2 )
+    SSxy = np.sum( x*y ) - n*mean_x*mean_y
+
+    # y = b + a x
+    # x = bp + ap y
+
+    a = SSxy/SSxx
+    ap = SSxy/SSyy
+    
+    b = mean_y - a*mean_x
+    
+    if not full_output:
+        return a, b
+
+    bp = mean_x - ap*mean_y
+
+    s2 = (SSyy - a*SSxy)/(n-2)
+    s = math.sqrt(s2)
+
+    SEb = s*math.sqrt( 1/n + mean_x**2/SSxx )
+    SEa = s/math.sqrt(SSxx)
+    
+    stats = dict(
+        r2 = a*ap,      # correlation coefficient
+        var_x = SSxx/n, # variance of x (sigma**2)
+        var_y = SSyy/n, # variance of y (sigma**2)
+        cov = SSxy/n,   # covariance
+        SEa = SEa,      # standard error for a
+        SEb = SEb,      # standard error for b
+        a = a,          # a in: y = ax + b
+        b = b,          # b in: y = ax + b
+        ap = ap,        # a' in: x = b' + a'y
+        bp = bp,        # b' in: x = b' + a'y
+        )
+    
+    return stats
+*************
+
+
+if __name__ == "__main__":
+    x = numpy.array((0, 1, 2, 3, 4))
+    y = numpy.array((4, 1, 0, 1, 4))
+    function = lambda x, params: params[0] + params[1]*x + params[2]*x**2
+    initial = (4, -4, 1)
+    print fit(x, y, function, initial)
+^ ^ ^ ^ ^ ^ ^
 
 
 def polyfitw(x, y, w, ndegree, return_fit=0):
