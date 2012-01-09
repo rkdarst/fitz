@@ -123,10 +123,10 @@ class Config(object):
 
     input = None  # overrides automatic input (.vob) file name
     vf = None  # String for mencoder video filter (for example, cropping)
-    mencoderopts = [ "-cache", "8092" ]
+    mencoderopts = [ "-cache", "16384" ]
     mplayeropts = [ ]  # only for do_source() type things
     threads = "auto"
-    x264opts = [ "--tune=film", "--trellis=2", "--b-pyramid", "--bframes=4", ]
+    x264opts = [ "--tune=film", ]
     x264opts_pass1 = [ ]
     x264opts_pass2 = [ ]
 
