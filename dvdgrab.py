@@ -22,12 +22,20 @@ Telecine:
 
 from ast import literal_eval
 import os
+import cPickle as pickle
+import logging
 import re
 import shutil
 import subprocess
 from subprocess import Popen, call
 import sys
 import time
+
+logger = logging.getLogger('dvdgrab')
+logger.addHandler(logging.StreamHandler())
+#logger.addHandler(logging.FileHandler('/dev/null'))
+#import cStringIO
+#logger.addHandler(logging.StreamHandler(cStringIO.StringIO())) # null
 
 #cache_enabled = True
 
@@ -76,6 +84,8 @@ class Config(object):
     extraname = ""     # Additional thing, like ".UTaH", for outputs and tmps.
     aspect = "4/3"     # like 4/3, 16/9, 2.35, 2.39.  Use "/"
     xysize = "720x480" # final size
+    rescale = False
+    detelecine = False
     fps = "24000/1001" # or "30000/1001".  Use "/"
     vbitrate = None    # Give only one of vbitrate, qp, crf, x264preset
     qp = None          # Give only one of vbitrate, qp, crf, x264preset
@@ -84,6 +94,7 @@ class Config(object):
     x264preset = None  # Give only one of vbitrate, qp, crf, x264preset
                        # x264preset = ultrafast,veryfast,faster,fast,medium,
                        # slow,slower,veryslow,placebo
+    passes = None      # override auto-detect number of passes.
 
     audio_rawrate = "48000" # ID_AUDIO_RATE=48000
     oggquality = 3
@@ -92,7 +103,7 @@ class Config(object):
     subtitles = { }    # example: {0:"en", 1:'es', 2:'fr', }
     cache = False      # Only regen files that are not there already.
     dry_run = False
-
+    extravname = ""    # Extra tag to add on to temporary video filenames.
 
     # Program locations
     mplayer = "mplayer"
@@ -143,9 +154,16 @@ class AutoConfig(object):
     def audio_rawrate(self):
         return self.iddict()['audio_rate']
 
+
 class Film(Config, object):
     def __init__(self, title, **kwargs):
         self.title = title
+        self.parseOptions(**kwargs)
+        if hasattr(self, 'init_hook'):
+            self.init_hook(**kwargs)
+    def __getitem__(self, attrname):
+        return getattr(self, attrname)
+    def parseOptions(self, **kwargs):
         for key, value in kwargs.items():
             if key.endswith('_update') and hasattr(self, key[:-7]):
                 key = key[:-7]
@@ -166,9 +184,6 @@ class Film(Config, object):
                     # (@properties) which don't have a descriptor set.
                     # This is sort of a hack... what's the better way?
                     self.__dict__[key] = value
-
-    def __getitem__(self, attrname):
-        return getattr(self, attrname)
     @property
     def f_sourcename(self):       return self.title
     @property
@@ -179,6 +194,9 @@ class Film(Config, object):
     def f_input(self):
         if self.input:    return self.input
         else:             return self.f_sourcename+".vob"
+    @property
+    def f_input_pickle(self):
+        return self.f_input + '.idpickle'
     @property
     def f_chapters(self):         return self.f_sourcename+".chapters.txt"
     #@property
@@ -196,7 +214,7 @@ class Film(Config, object):
     #def f_x264log(self):          return self.tmp+self.f_basename+".video.x264.log"
     @property
     def f_videobasename(self):
-        return self.f_basename+(".video%s"%self.qualitytag)
+        return self.f_basename+(".video%s%s"%(self.qualitytag,self.extravname))
     @property
     def f_video_fifo(self):
         return self.tmp_fifo+self.f_videobasename+".fifo"
@@ -225,6 +243,121 @@ class Film(Config, object):
         else:
             return self.tmp
 
+    def get_lsdvd(self):
+        """Get lsdvd output from the original dvd.
+
+        Return a dictionary representing the `lsdvd` utility
+        information.
+
+        There is one change to the output format.  The 'track' key is
+        now the information about this track in specific, instead of
+        about all tracks."""
+        try:
+            dat = pickle.load(open(self.f_input_pickle, 'rb'))
+        except IOError:
+            return None
+        dat = dat['lsdvd']
+        dat['track'] = dat['track'][0]
+        return dat
+    def get_identify(self, asdict=False):
+        """Get mplayer -identify output from the original dvd.
+
+        This is a list of (key, value) pairs, with all keys converted
+        to lower case."""
+        try:
+            dat = pickle.load(open(self.f_input_pickle, 'rb'))
+        except IOError:
+            logger.warn("Not using pre-computed identify information")
+            return self.do_iddict()
+        dat = dat['mplayer']
+
+        data = [ ]
+        line_re = re.compile(r'ID_(\w+)=([^\n]*)')
+        for line in dat:
+            m = line_re.match(line.strip())
+            if m:
+                data.append((m.group(1).lower(), m.group(2).strip()))
+        if asdict:
+            data = dict(data)
+        return data
+
+    def detectaudio(self):
+        """Automatically get audio data."""
+        data = self.get_lsdvd()
+        if data is None: return None
+        audio = { }
+        for a in data['track']['audio']:
+            aid = literal_eval(a['streamid'])
+            lang = a['langcode']
+            audio[aid] = lang
+        data = self.get_identify()
+        for key,value in data:
+            if key == 'audio_id':
+                assert int(value) in audio \
+                       or hasattr(self, '_overrideAudioErrors')
+        #print audio, self.f_input
+        return audio
+    def detectsubtitles(self):
+        """Automatically get subtitle data."""
+        data = self.get_lsdvd()
+        if data is None: return None
+        subtitles = { }
+        for i, s in enumerate(data['track']['subp']):
+            sid = i  #literal_eval(s['streamid']) # count from zero instead
+            lang = s['langcode']
+            subtitles[sid] = lang
+        data = self.get_identify()
+        for key,value in data:
+            if key == 'subtitle_id':
+                assert int(value) in subtitles \
+                       or hasattr(self, '_overrideSubErrors')
+        return subtitles
+
+    def do_checkconfig(self):
+        data = self.do_idlist()
+
+        audio = self.detectaudio()
+        for key,value in data:
+            if key == 'audio_id' and int(value) not in audio:
+                print "Not found:", self.f_basename, 'audio:', value
+
+        subtitles = self.detectsubtitles()
+        for key,value in data:
+            if key == 'subtitle_id' and int(value) not in subtitles:
+                print "Not found:", self.f_basename, 'sub:', value
+    def do_cropdetect(self):
+        idd = self.get_identify(asdict=True)
+        skip = 60
+        if 'length' not in idd:
+            print logger.warn('No length found for %s'%self.f_basename)
+
+        if float(idd.get('length', 60)) < 60:
+            skip = float(idd['length']) / 2
+        cmd = [self.mplayer, '-benchmark', '-vo', 'null', '-nosound',
+               '-msglevel', 'all=1:vfilter=6',
+               '-ss', '%ss'%skip, '-frames', '1000',
+               '-vf', 'cropdetect',
+               self.f_input]
+        #print cmd
+        ps = Popen(cmd,
+                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        dat = ps.stdout.read()
+        #print dat
+        matches = tuple(re.finditer(r'-vf crop=((\d+):(\d+):(\d+):(\d+))',dat))
+        #print matches
+        if len(matches) == 0:
+            print logger.warn('No cropdetect matches found for %s'%self.f_basename)
+            return
+        m = matches[-1]
+        x = int(m.group(2))
+        y = int(m.group(3))
+        curx, cury = self.xysize.split('x')
+        curx, cury = int(curx), int(cury)
+        #print m.group(0), curx, cury
+        if x < curx - 16 or y < cury - 16:
+            print "%-30s"%self.f_basename[:30], m.group(1)
+
+
     def do_listcommands(self):
         return [ name[3:] for name in dir(self) if name.startswith('do_') ]
 
@@ -236,16 +369,51 @@ class Film(Config, object):
         self.do_merge()
 
     def do_source(self, track):
-        # Get the raw vob stream
-        cmd = [ self.mplayer, "dvd://%d"%track,
-                "-dvd-device", self.dvddev,
-                "-dumpstream",
-                "-dumpfile", self.f_input ] + self.mplayeropts
-        print cmd
-        if not self.dry_run:
-            call(cmd)
+        pickle_data = { }
 
-        # get chapter data
+        # Set up the two mplayer commands: cmd_dump for -dumpstream,
+        # cmd_identify for -identify
+        cmd_base = [ self.mplayer, "dvd://%d"%track,
+                     "-dvd-device", self.dvddev, ] + self.mplayeropts
+        cmd_dump = cmd_base + ["-dumpstream", "-dumpfile", self.f_input ]
+        cmd_identify = cmd_base +["-identify", "-msglevel", "identify=9:all=9",
+                                  "-vo", "null", "-ao", "null",
+                                  "-frames", "1",]
+        cmd_identify[0] = self.mplayerid
+
+        # Do mplayer -dumpstream and get the raw vob stream
+        print cmd_dump
+        if not self.dry_run:
+            call(cmd_dump)
+
+        # Grab output from mplayer -identify at this stage
+        print cmd_identify
+        if not self.dry_run:
+            ps = Popen(cmd_identify,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            dat = ps.stdout.read()
+            dat = dat.split('\n')
+            dat = [ l for l in dat if l.startswith('ID_')
+                                   or "VIDEO:" in l
+                                   or "AUDIO:" in l ]
+            pickle_data['mplayer'] = dat
+
+        # Grab output from lsdvd at this page
+        cmd_lsdvd = ["lsdvd", "-Oy", "-x", "-t", "%d"%track, self.dvddev ]
+        print cmd_lsdvd
+        if not self.dry_run:
+            ps = Popen(cmd_lsdvd,
+                       stdout=subprocess.PIPE)
+            dat = ps.stdout.read()
+            dat = dat.split('= ', 1)[1] # remove initial 'lsdvd = '
+            dat = literal_eval(dat)
+            pickle_data['lsdvd'] = dat
+
+        if not self.dry_run:
+            pickle.dump(pickle_data, open(self.f_input_pickle, 'wb'), -1)
+
+
+        # Grap chapter data
         cmd = [ "dvdxchap", "-t", str(track), self.dvddev, ]
         print cmd
         fchap = open(self.f_chapters, 'w')
@@ -261,12 +429,15 @@ class Film(Config, object):
         #if os.access(self.f_sub_info, os.F_OK):
         #    call(('chmod', 'u+rw', self.f_sub_info))
 
-    def do_identify(self, all=False):
+    def do_identify(self, all=False, print_=True):
         """Information about the .vob file"""
-        print "**** Information on:", self.f_input
-        ps = Popen([self.mplayerid, "-identify", "-frames", "1",
-                    "-msglevel", "identify=9:all=9", "-vo", "null", "-ao", "null",
-                    self.f_input],
+        if print_:
+            print "**** Information on:", self.f_input
+        cmd = [self.mplayerid, "-identify", "-frames", "1",
+               "-msglevel", "identify=9:all=9", "-vo", "null", "-ao", "null",
+               self.f_input]
+        logger.debug(repr(cmd))
+        ps = Popen(cmd,
                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         dat = ps.stdout.read()
         dat = dat.split('\n')
@@ -284,8 +455,9 @@ class Film(Config, object):
                                    or "VIDEO_ASPECT" in l
                                    or "LENGTH" in l]
             dat.sort() # not sort 'all'.
-        print "\n".join(dat)
-        print
+        if print_:
+            print "\n".join(dat)
+            print
         return dat
     def do_identifyall(self):
         self.do_identify(all=True)
@@ -297,7 +469,7 @@ class Film(Config, object):
             return self._iddict
 
         data = { }
-        dat = self.do_identify(all=True)
+        dat = self.do_identify(all=True, print_=False)
         line_re = re.compile(r'ID_(\w+)=([^\n]*)')
         for line in dat:
             m = line_re.match(line.strip())
@@ -305,6 +477,20 @@ class Film(Config, object):
                 data[m.group(1).lower()] = m.group(2).strip()
         self._iddict = data
         return self._iddict
+    def do_idlist(self):
+        """Return a dict of the identified portions."""
+        if hasattr(self, '_idlist'):
+            return self._idlist
+
+        data = [ ]
+        dat = self.do_identify(all=True, print_=False)
+        line_re = re.compile(r'ID_(\w+)=([^\n]*)')
+        for line in dat:
+            m = line_re.match(line.strip())
+            if m:
+                data.append((m.group(1).lower(), m.group(2).strip()))
+        self._idlist = data
+        return self._idlist
 
     def do_detecttc(self):
         """Print out just the framerate changes.
@@ -327,6 +513,13 @@ class Film(Config, object):
         dat = [l for l in dat if 'demux_mpg' in l]
         print '\n'.join(dat)
         return dat
+
+    def do_showaudiosubs(self):
+        audio = self.audio #detectaudio()
+        subs = self.subtitles #detectsubtitles()
+        print "%-30s"%self.f_input[:30], \
+              "  ", ",".join("%s:%s"%x for x in sorted(audio.items())), \
+              "  ", ",".join("%s:%s"%x for x in sorted(subs.items()))
 
     @asneeded('tuple(self.f_subsub(i) for i in self.subtitles.keys())'
               '+ tuple(self.f_subidx(i) for i in self.subtitles.keys())')
@@ -409,14 +602,19 @@ class Film(Config, object):
                     "-o", self.f_video_fifo,
                     #-vf crop=720:464:0:6,scale=704:384,dsize=-1,format=I420
                     self.f_input]
+        # Create the video filter
+        vf = [ ]
+        if self.detelecine:
+            vf.append('pullup,softskip,harddup')
         if self.vf:
-            mencoder[1:1] = ["-vf", self.vf+",dsize=-1,format=I420"]
-        else:
-            mencoder[1:1] = ["-vf", "dsize=-1,format=I420"]
+            vf.append(self.vf)
+        if self.rescale:
+            vf.append('scale=%s'%(self.xysize.replace('x',':')))
+        vf.append("dsize=-1,format=I420") # output encoding
+        mencoder[1:1] = ["-vf", ",".join(vf)]
+        # other options
         mencoder[1:1] = self.mencoderopts
 
-        #if var.has_key("mplayeropts"):
-        #    mencoder[1:1] = var["mplayeropts"]
         # check aspect for x264
         aspect = self.aspect
         aspect = aspect.replace("/", ":")
@@ -453,17 +651,18 @@ class Film(Config, object):
             x264[1:1] = ["--preset", str(self.x264preset)]
 
         # "crf" is a one-pass encoding.
-        if self.crf or self.x264preset:
+        if not self.vbitrate and self.passes in (None, 1):
             x264[1:1] = ["-o", self.f_video_final]
             x264[1:1] = self.x264opts_pass2
 
-            print "****Beginning only pass (with crf)"
+            print "****Beginning only pass"
             print mencoder
             print x264
             if not self.dry_run:
-                Popen(mencoder)
+                p1 = Popen(mencoder)
                 time.sleep(1)
                 call(x264)
+                p1.wait()
 
         else:
             x264_pass1 = x264[:]
@@ -481,17 +680,19 @@ class Film(Config, object):
             print mencoder
             print x264_pass1
             if not self.dry_run:
-                Popen(mencoder)
+                p1 = Popen(mencoder)
                 time.sleep(1)
                 call(x264_pass1)
+                p1.wait()
 
             print "****Beginning pass 2"
             print mencoder
             print x264_pass2
             if not self.dry_run:
-                Popen(mencoder)
+                p2 = Popen(mencoder)
                 time.sleep(1)
                 call(x264_pass2)
+                p2.wait()
 
         print "****Done with video encoding"
         os.unlink(self.f_video_fifo)
@@ -546,10 +747,10 @@ class Episode(Film):
     def __init__(self, title,
                  seriestitle=None,
                  season=None, episode=None, **kwargs):
-        super(Episode, self).__init__(title=title, **kwargs)
         if season:       self.season      = season
         if seriestitle:  self.seriestitle = seriestitle
         if episode:      self.episode     = episode
+        super(Episode, self).__init__(title=title, **kwargs)
 
     @property
     def SxEid(self):
@@ -576,6 +777,10 @@ def getx264version(cmd):
         return version
 
 def get_episode(episodes, s):
+    if s == "*":
+        for e in episodes:
+            yield e
+        return
     try:
         i = int(s)
         for e in episodes:
@@ -589,7 +794,7 @@ def get_episode(episodes, s):
         except ValueError:
             pass # leave i as string
         season = int(season)
-        print i, season
+        #print i, season
         for e in episodes:
             if e.season == season and (e.episode == i or i=="*"):
                 yield e
@@ -601,7 +806,10 @@ def main_tvshow(episodes):
     "Valid commands: "+" ".join(episodes[0].do_listcommands()))
     parser.add_option("--track", "-t", type=int)
     parser.add_option("--config", "-c", type=str, action='append')
+    parser.add_option("--loglevel", "-l", type=str, default='warn')
     (options, args) = parser.parse_args()
+
+    logging.basicConfig(level=getattr(logging, options.loglevel.upper()))
 
     kwargs = { }
     if options.config:
@@ -613,8 +821,7 @@ def main_tvshow(episodes):
     cmds = args[0].split(',')
     for s in args[1:]:
         for e in get_episode(episodes, s):
-            for k, v in kwargs.items():
-                setattr(e, k, v)
+            e.parseOptions(**kwargs)
 
             for cmd in cmds:
                 if cmd == "source":
