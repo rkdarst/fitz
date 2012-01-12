@@ -25,6 +25,7 @@ import os
 import cPickle as pickle
 import logging
 import re
+import shlex
 import shutil
 import subprocess
 from subprocess import Popen, call
@@ -45,6 +46,13 @@ def var_eval(v):
         v = literal_eval(v)
     except (SyntaxError, NameError, ValueError):
         pass
+    return v
+
+def listify(v):
+    """Turn a string into a list, for use in options list."""
+    if isinstance(v, str):
+        # shlex returns a list.
+        return shlex.split(v)
     return v
 
 def asneeded(deps, prereqs=None):
@@ -374,7 +382,7 @@ class Film(Config, object):
         # Set up the two mplayer commands: cmd_dump for -dumpstream,
         # cmd_identify for -identify
         cmd_base = [ self.mplayer, "dvd://%d"%track,
-                     "-dvd-device", self.dvddev, ] + self.mplayeropts
+                     "-dvd-device", self.dvddev, ] + listify(self.mplayeropts)
         cmd_dump = cmd_base + ["-dumpstream", "-dumpfile", self.f_input ]
         cmd_identify = cmd_base +["-identify", "-msglevel", "identify=9:all=9",
                                   "-vo", "null", "-ao", "null",
@@ -564,7 +572,7 @@ class Film(Config, object):
 #              "-vf", self.vf,
               "-o", self.f_audio_fifo(aid),
               self.f_input,
-              ] + self.mencoderopts
+              ] + listify(self.mencoderopts)
 
         oggquality = self.oggquality
         if self.oggquality_aid and aid in self.oggquality_aid:
@@ -607,13 +615,13 @@ class Film(Config, object):
         if self.detelecine:
             vf.append('pullup,softskip,harddup')
         if self.vf:
-            vf.append(self.vf)
+            vf.extend(listify(self.vf))
         if self.rescale:
             vf.append('scale=%s'%(self.xysize.replace('x',':')))
         vf.append("dsize=-1,format=I420") # output encoding
         mencoder[1:1] = ["-vf", ",".join(vf)]
         # other options
-        mencoder[1:1] = self.mencoderopts
+        mencoder[1:1] = listify(self.mencoderopts)
 
         # check aspect for x264
         aspect = self.aspect
@@ -629,13 +637,13 @@ class Film(Config, object):
                 #"--psnr",
                 #"--verbose",
                 self.f_video_fifo]
+        x264[1:1] = listify(self.x264opts)
 
         if getx264version(self.x264) >= '0.104':
             x264.extend(['--input-res', self.xysize])
         else:
             x264.extend([self.xysize])
 
-        x264[1:1] = self.x264opts
 
         if self.vbitrate:
             x264[1:1] = ["--bitrate", str(self.vbitrate)]
@@ -653,7 +661,7 @@ class Film(Config, object):
         # "crf" is a one-pass encoding.
         if not self.vbitrate and self.passes in (None, 1):
             x264[1:1] = ["-o", self.f_video_final]
-            x264[1:1] = self.x264opts_pass2
+            x264[1:1] = listify(self.x264opts_pass2)
 
             print "****Beginning only pass"
             print mencoder
@@ -670,11 +678,11 @@ class Film(Config, object):
 
             x264_pass1[1:1] = ["--pass", "1"]
             x264_pass1[1:1] = ["-o", "/dev/null"]
-            x264_pass1[1:1] = self.x264opts_pass1
+            x264_pass1[1:1] = listify(self.x264opts_pass1)
 
             x264_pass2[1:1] = ["--pass", "2"]
             x264_pass2[1:1] = ["-o", self.f_video_final]
-            x264_pass2[1:1] = self.x264opts_pass2
+            x264_pass2[1:1] = listify(self.x264opts_pass2)
 
             print "****Beginning pass 1"
             print mencoder
