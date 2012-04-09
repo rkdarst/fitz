@@ -128,20 +128,28 @@ class Config(object):
     cache = False      # Only regen files that are not there already.
     dry_run = False
     extravname = ""    # Extra tag to add on to temporary video filenames.
+    extraoutname = ""    # Extra tag to add on to final file
 
     # Program locations
     mplayer = "mplayer"
     mplayerid = "mplayer"
     mencoder = "mencoder"
     x264 = "x264"
+    dvddev = "/dev/dvd"
+    dvdmount = "/media/cdrom"
     if os.uname()[1] == "ramanujan":
         mplayer = "/home/richard/sys/MPlayer-1.0rc1/mplayer"
         mencoder = "/home/richard/sys/MPlayer-1.0rc1/mencoder"
         x264 = "/home/richard/sys/x264/x264"
     if os.uname()[1] == "pyke":
         x264 = "/home/richard/sys/x264/x264"
-    dvddev = "/dev/dvd"
-    dvdmount = "/media/cdrom"
+        tmp_fifo = "/home/richard/tmp/"
+    if os.uname()[1] == "ehrenfest":
+        mplayer = "/home/richard/sys/MPlayer-1.0rc4/mplayer"
+        mencoder = "/home/richard/sys/MPlayer-1.0rc4/mencoder"
+        #x264 = "/home/richard/sys/x264/x264"
+        dvddev = '/dev/sr0'
+
     tmp = "tmp."      # prefix for temporary files
     #tmp_fifo="/tmp"  # prefix for fifos (local filesystem)
 
@@ -150,7 +158,7 @@ class Config(object):
     mencoderopts = [ "-cache", "16384" ]
     mplayeropts = [ ]  # only for do_source() type things
     threads = "auto"
-    x264opts = [ "--tune=film", ]
+    x264opts = [ "--tune=film", "--non-deterministic", "--psnr"]
     x264opts_pass1 = [ ]
     x264opts_pass2 = [ ]
 
@@ -247,7 +255,7 @@ class Film(Config, object):
         return self.tmp+self.f_videobasename+".mkv"
     @property
     def f_output(self):
-        return self.f_basename+".mkv"
+        return self.f_basename+self.extraoutname+".mkv"
     #@property
     #def f_output(self):
     #    return self.f_basename+("%s.mkv"%self.qualitytag)
@@ -581,6 +589,7 @@ class Film(Config, object):
         # Run in background
         mencoder = [self.mencoder,
               "-ovc", "copy", "-vc", "dummy",
+              "-quiet",
               "-aid", str(aid),
               "-ofps", str(self.fps),
               "-of", "rawaudio",
@@ -597,7 +606,7 @@ class Film(Config, object):
         oggenc = ["oggenc",
               "-q"+str(oggquality),
               "--title", self.audio[aid],  # Could be made "English"
-              "--quiet",
+              #"--quiet",
               "--raw-rate", str(self.audio_rawrate),
               "-o"+self.f_audio_final(aid),
               self.f_audio_fifo(aid),
