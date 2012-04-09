@@ -18,7 +18,16 @@ Telecine:
   fps = '24000/1001'
   vf = 'pullup,softskip,harddup'
 
+Coding standards:
+- http://scenenotice.org/details.php?id=2028
+
+Utility programs:
+- mplayer
+- dvdxchap (package ogmtools)
+- lsdvd (package lsdvd)
+
 """
+
 
 from ast import literal_eval
 import os
@@ -39,6 +48,13 @@ logger.addHandler(logging.StreamHandler())
 #logger.addHandler(logging.StreamHandler(cStringIO.StringIO())) # null
 
 #cache_enabled = True
+
+system_procs = 1
+try:
+    import multiprocessing
+    system_procs = multiprocessing.cpu_count()
+except ImportError:
+    pass
 
 def var_eval(v):
     """Evaluate """
