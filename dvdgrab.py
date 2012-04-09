@@ -628,25 +628,27 @@ class Film(Config, object):
             print self.f_video_fifo, self.tmp_fifo
             os.mkfifo(self.f_video_fifo)
 
-        mencoder = [self.mencoder,
-                    "-quiet", "-sid", "2999", # dummy sid to disable them.
-                    "-oac", "copy", "-ovc", "raw", "-of", "rawvideo",
-                    "-ofps", self.fps,
-                    "-o", self.f_video_fifo,
-                    #-vf crop=720:464:0:6,scale=704:384,dsize=-1,format=I420
-                    self.f_input]
-        # Create the video filter
-        vf = [ ]
-        if self.detelecine:
-            vf.append('pullup,softskip,harddup')
-        if self.vf:
-            vf.extend(listify(self.vf))
-        if self.rescale:
-            vf.append('scale=%s'%(self.xysize.replace('x',':')))
-        vf.append("dsize=-1,format=I420") # output encoding
-        mencoder[1:1] = ["-vf", ",".join(vf)]
-        # other options
-        mencoder[1:1] = listify(self.mencoderopts)
+        #mencoder = [self.mencoder,
+        #            "-quiet", "-sid", "2999", # dummy sid to disable them.
+        #            "-oac", "copy", "-ovc", "raw", "-of", "rawvideo",
+        #            "-ofps", self.fps,
+        #            "-o", self.f_video_fifo,
+        #            #-vf crop=720:464:0:6,scale=704:384,dsize=-1,format=I420
+        #            self.f_input]
+        ## Create the video filter
+        #vf = [ ]
+        #if self.detelecine:
+        #    vf.append('pullup,softskip,harddup')
+        #    self.fps = "24000/1001"
+        #if self.vf:
+        #    vf.extend(listify(self.vf))
+        #if self.rescale:
+        #    vf.append('scale=%s'%(self.xysize.replace('x',':')))
+        #vf.append("dsize=-1,format=I420") # output encoding
+        #mencoder[1:1] = ["-vf", ",".join(vf)]
+        ## other options
+        #mencoder[1:1] = listify(self.mencoderopts)
+        mencoder = self.get_videocommand(self.f_video_fifo, type='raw')
 
         # check aspect for x264
         aspect = self.aspect
@@ -729,6 +731,173 @@ class Film(Config, object):
 
         print "****Done with video encoding"
         os.unlink(self.f_video_fifo)
+
+    def get_videocommand(self, out, type='yuv4mpeg'):
+        """Return a list which is a """
+        if type == 'raw':
+            cmd = [self.mencoder,
+                   "-quiet", "-sid", "2999", # dummy sid to disable them.
+                   "-oac", "copy", "-ovc", "raw", "-of", "rawvideo",
+                   "-ofps", self.fps,
+                   "-o", self.f_video_fifo,
+                   #-vf crop=720:464:0:6,scale=704:384,dsize=-1,format=I420
+                   "-quiet",
+                   self.f_input]
+        elif type == 'yuv4mpeg':
+            cmd = [self.mplayer,
+                   '-noconsolecontrols', "-quiet",
+                   "-sid", "2999", # dummy sid to disable them.
+                   "-fps", self.fps,
+                   '-ao', 'null',
+                   '-vo', 'yuv4mpeg:file='+out, "-ni",
+                   '-nosound', '-benchmark',
+                   self.f_input
+                   ]
+        else:
+            raise ValueError('Unknown type: %s'%type)
+        # Create the video filter
+        vf = [ ]
+        if self.detelecine:
+            vf.append('pullup,softskip,harddup')
+            self.fps = "24000/1001"
+        if self.vf:
+            vf.extend(listify(self.vf))
+        if self.rescale:
+            vf.append('scale=%s'%(self.xysize.replace('x',':')))
+        vf.append("dsize=-1") # output encoding
+        cmd[1:1] = ["-vf", ",".join(vf)]
+        # other options
+        cmd[1:1] = listify(self.mencoderopts)
+        return cmd
+
+    def do_videoffmpeg(self):
+        print "****Video"
+        if not os.access(self.f_video_fifo, os.F_OK):
+            print self.f_video_fifo, self.tmp_fifo
+            os.mkfifo(self.f_video_fifo)
+
+
+        aspect = self.aspect
+        aspect = aspect.replace("/", ":")
+        if aspect.find(':') == -1:
+            aspect = "1:"+aspect   # it should be w:h (?)
+
+        mencoder = self.get_videocommand(self.f_video_fifo, type='yuv4mpeg')
+
+        ffmpeg = ['ffmpeg',
+                  #'ffmpeg2theora',
+                  "-s", self.xysize,
+                  "-threads", str(self.threads),
+                  #"-target", "",
+                  # -sameq is very large, -qscale=1 == -sameq, -qscale=2 ~= 3
+                  # -qscale=3 is about 1/2 as big, but noticable metablocking.
+                  #"-sameq",
+                  '-qscale', '2',  # 0-31
+                  #"-f", 'rawvideo', "-i", self.f_video_fifo,
+                  "-r", self.fps,
+                  "-f", 'yuv4mpegpipe', "-i", self.f_video_fifo,
+                  '-vcodec', 'mpeg4',
+                  '-aspect', aspect,
+                  "-r", self.fps,
+                  '-f', 'matroska', '-y', self.f_video_final]
+        # -map
+
+        print "****ffmpeg"
+        print mencoder
+        print ffmpeg
+        if not self.dry_run:
+            p1 = Popen(mencoder)
+            time.sleep(1)
+            call(ffmpeg)
+            p1.wait()
+
+
+    def do_ffmpeg_jfm(self):
+        print "****Video"
+        if not os.access(self.f_video_fifo, os.F_OK):
+            print self.f_video_fifo, self.tmp_fifo
+            os.mkfifo(self.f_video_fifo)
+
+
+        aspect = self.aspect
+        aspect = aspect.replace("/", ":")
+        if aspect.find(':') == -1:
+            aspect = "1:"+aspect   # it should be w:h (?)
+
+        mencoder = self.get_videocommand(self.f_video_fifo, type='yuv4mpeg')
+
+        ffmpeg = ['ffmpeg',
+                  #'ffmpeg2theora',
+                  "-s", self.xysize,
+                  "-f", 'yuv4mpegpipe', "-i", self.f_video_fifo,
+                  "-i", self.f_input,
+                  "-threads", str(self.threads) if self.threads != 'auto' else "2",
+                  #"-target", "",
+                  # -sameq is very large, -qscale=1 == -sameq, -qscale=2 ~= 3
+                  # -qscale=3 is about 1/2 as big, but noticable metablocking.
+                  #"-sameq",
+                  '-qscale', '2',  # 0-31
+                  #'-aq', '',
+                  #"-f", 'rawvideo', "-i", self.f_video_fifo,
+                  "-map", "0.0", "-map", "1.2",
+                  "-r", self.fps,
+                  '-vcodec', 'mpeg4',
+                  "-acodec", "mp2",
+                  '-aspect', aspect,
+                  "-f", "mp4",
+                  '-y', self.f_basename+self.extraoutname+'.ffmpeg.mpg']
+        # -vcodec mpeg4 -acodec copy -f mp4 -> .ffmpeg.mp4.mpg
+        # -vcodec mpeg4 -acodec copy -f mpeg -> fails to play in mplayer
+        # -vcodec unset -acodec unset -f mpeg -> (mpeg1video,mp2) (B) glitches
+        # -vcodec mpeg2video -acodec mp2 -f mpeg -> (C) works
+        # -vcodec mpeg4 -acodec mp2 -f mp4 -> best for jfm's computer.
+
+        print "****ffmpeg"
+        print mencoder
+        print ffmpeg
+        if not self.dry_run:
+            p1 = Popen(mencoder)
+            time.sleep(1)
+            call(ffmpeg)
+            p1.wait()
+
+
+    def do_videotheora(self):
+        print "****Video"
+        if not os.access(self.f_video_fifo, os.F_OK):
+            print self.f_video_fifo, self.tmp_fifo
+            os.mkfifo(self.f_video_fifo)
+
+        mencoder = self.get_videocommand(self.f_video_fifo, type='yuv4mpeg')
+
+        aspect = self.aspect
+        aspect = aspect.replace("/", ":")
+        if aspect.find(':') == -1:
+            aspect = "1:"+aspect   # it should be w:h (?)
+
+        ffmpeg = ['ffmpeg2theora',
+                  #"-s", self.xysize,
+                  "--inputfps", self.fps,
+                  #"-threads", str(self.threads),
+                  #"-target", "",
+                  #"-sameq",
+                  '--videoquality', '5',  # 0--10, default 5, higher=better
+                  #"-f", 'rawvideo', #"-i",
+                  self.f_video_fifo,
+                  '--aspect', aspect,
+                  #'-f', 'matroska',
+                  '-o', self.f_video_final]
+
+
+        print "****ffmpeg2thera"
+        print mencoder
+        print ffmpeg
+        if not self.dry_run:
+            p1 = Popen(mencoder)
+            time.sleep(1)
+            call(ffmpeg)
+            p1.wait()
+
 
 
     #@asneeded('(self.f_final, )',
