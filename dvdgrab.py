@@ -141,6 +141,8 @@ class Config(object):
         mplayer = "/home/richard/sys/MPlayer-1.0rc1/mplayer"
         mencoder = "/home/richard/sys/MPlayer-1.0rc1/mencoder"
         x264 = "/home/richard/sys/x264/x264"
+        if os.getcwd().startswith('/mnt/lithium'):
+            tmp_fifo = "/home/richard/tmp/"
     if os.uname()[1] == "pyke":
         x264 = "/home/richard/sys/x264/x264"
         tmp_fifo = "/home/richard/tmp/"
@@ -236,7 +238,7 @@ class Film(Config, object):
     def f_sub(self, sid):         return self.tmp+self.f_basename+".subs.%d"%sid
     def f_subsub(self, sid):      return self.tmp+self.f_basename+".subs.%d.sub"%sid
     def f_subidx(self, sid):      return self.tmp+self.f_basename+".subs.%d.idx"%sid
-    def f_audio_fifo(self, aid):  return self.tmp_fifo+self.f_basename+".audio.%d.fifo"%aid
+    def f_audio_fifo(self, aid):  return self.tmp_fifo_auto+self.f_basename+".audio.%d.fifo"%aid
     def f_audio_final(self, aid): return self.tmp+self.f_basename+".audio.%d.ogg"%aid
     #@property
     #def f_videobasename(self):
@@ -249,7 +251,7 @@ class Film(Config, object):
         return self.f_basename+(".video%s%s"%(self.qualitytag,self.extravname))
     @property
     def f_video_fifo(self):
-        return self.tmp_fifo+self.f_videobasename+".fifo"
+        return self.tmp_fifo_auto+self.f_videobasename+".fifo"
     @property
     def f_video_final(self):
         return self.tmp+self.f_videobasename+".mkv"
@@ -270,10 +272,9 @@ class Film(Config, object):
         return quality
 
     @property
-    def tmp_fifo(self):
-        if 'tmp_fifo' in self.__dict__: return self.__dict__['tmp_fifo']
-        else:
-            return self.tmp
+    def tmp_fifo_auto(self):
+        if hasattr(self, 'tmp_fifo'): return self.tmp_fifo
+        else: return self.tmp
 
     def get_lsdvd(self):
         """Get lsdvd output from the original dvd.
@@ -625,7 +626,6 @@ class Film(Config, object):
     def do_video(self):
         print "****Video"
         if not os.access(self.f_video_fifo, os.F_OK):
-            print self.f_video_fifo, self.tmp_fifo
             os.mkfifo(self.f_video_fifo)
 
         #mencoder = [self.mencoder,
@@ -838,6 +838,7 @@ class Film(Config, object):
                   #"-sameq",
                   '-qscale', '2',  # 0-31
                   #'-aq', '',
+                  '-ab', '192k',
                   #"-f", 'rawvideo', "-i", self.f_video_fifo,
                   "-map", "0.0", "-map", "1.2",
                   "-r", self.fps,
