@@ -39,6 +39,7 @@ import shutil
 import subprocess
 from subprocess import Popen, call
 import sys
+import pipes
 import time
 
 logger = logging.getLogger('dvdgrab')
@@ -70,6 +71,10 @@ def listify(v):
         # shlex returns a list.
         return shlex.split(v)
     return v
+
+def print_cmd(v):
+    v = [ pipes.quote(s) for s in v ]
+    print " ".join(v)
 
 def asneeded(deps, prereqs=None):
     def _tmp(f):
@@ -415,12 +420,12 @@ class Film(Config, object):
         cmd_identify[0] = self.mplayerid
 
         # Do mplayer -dumpstream and get the raw vob stream
-        print cmd_dump
+        print_cmd(cmd_dump)
         if not self.dry_run:
             call(cmd_dump)
 
         # Grab output from mplayer -identify at this stage
-        print cmd_identify
+        print_cmd(cmd_identify)
         if not self.dry_run:
             ps = Popen(cmd_identify,
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -433,7 +438,7 @@ class Film(Config, object):
 
         # Grab output from lsdvd at this page
         cmd_lsdvd = ["lsdvd", "-Oy", "-x", "-t", "%d"%track, self.dvddev ]
-        print cmd_lsdvd
+        print_cmd(cmd_lsdvd)
         if not self.dry_run:
             ps = Popen(cmd_lsdvd,
                        stdout=subprocess.PIPE)
@@ -448,7 +453,7 @@ class Film(Config, object):
 
         # Grap chapter data
         cmd = [ "dvdxchap", "-t", str(track), self.dvddev, ]
-        print cmd
+        print_cmd(cmd)
         fchap = open(self.f_chapters, 'w')
         if not self.dry_run:
             call(cmd, stdout=fchap)
@@ -572,7 +577,7 @@ class Film(Config, object):
                     "-ofps", str(self.fps), "-o", "/dev/null",
                     "-sid", str(sid), "-vobsubout", self.f_sub(sid),
                     self.f_input, ]
-            print cmd
+            print_cmd(cmd)
             if not self.dry_run:
                 call(cmd)
 
@@ -612,8 +617,8 @@ class Film(Config, object):
               "-o"+self.f_audio_final(aid),
               self.f_audio_fifo(aid),
               ]
-        print mencoder
-        print oggenc
+        print_cmd(mencoder)
+        print_cmd(oggenc)
         if not self.dry_run:
             Popen(mencoder)
             time.sleep(1)
@@ -691,8 +696,8 @@ class Film(Config, object):
             x264[1:1] = listify(self.x264opts_pass2)
 
             print "****Beginning only pass"
-            print mencoder
-            print x264
+            print_cmd(mencoder)
+            print_cmd(x264)
             if not self.dry_run:
                 p1 = Popen(mencoder)
                 time.sleep(1)
@@ -712,8 +717,8 @@ class Film(Config, object):
             x264_pass2[1:1] = listify(self.x264opts_pass2)
 
             print "****Beginning pass 1"
-            print mencoder
-            print x264_pass1
+            print_cmd(mencoder)
+            print_cmd(x264_pass1)
             if not self.dry_run:
                 p1 = Popen(mencoder)
                 time.sleep(1)
@@ -721,8 +726,8 @@ class Film(Config, object):
                 p1.wait()
 
             print "****Beginning pass 2"
-            print mencoder
-            print x264_pass2
+            print_cmd(mencoder)
+            print_cmd(x264_pass2)
             if not self.dry_run:
                 p2 = Popen(mencoder)
                 time.sleep(1)
@@ -803,8 +808,8 @@ class Film(Config, object):
         # -map
 
         print "****ffmpeg"
-        print mencoder
-        print ffmpeg
+        print_cmd(mencoder)
+        print_cmd(ffmpeg)
         if not self.dry_run:
             p1 = Popen(mencoder)
             time.sleep(1)
@@ -854,8 +859,8 @@ class Film(Config, object):
         # -vcodec mpeg4 -acodec mp2 -f mp4 -> best for jfm's computer.
 
         print "****ffmpeg"
-        print mencoder
-        print ffmpeg
+        print_cmd(mencoder)
+        print_cmd(ffmpeg)
         if not self.dry_run:
             p1 = Popen(mencoder)
             time.sleep(1)
@@ -891,8 +896,8 @@ class Film(Config, object):
 
 
         print "****ffmpeg2thera"
-        print mencoder
-        print ffmpeg
+        print_cmd(mencoder)
+        print_cmd(ffmpeg)
         if not self.dry_run:
             p1 = Popen(mencoder)
             time.sleep(1)
@@ -935,7 +940,7 @@ class Film(Config, object):
 
         # Merge it all
         mkvmerge.extend(["-o", self.f_output])
-        print mkvmerge
+        print_cmd(mkvmerge)
         if not self.dry_run:
             call(mkvmerge)
 
