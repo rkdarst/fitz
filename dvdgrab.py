@@ -140,25 +140,29 @@ class Config(object):
     mplayerid = "mplayer"
     mencoder = "mencoder"
     x264 = "x264"
+    ffmpeg = "ffmpeg"
     dvddev = "/dev/dvd"
     dvdmount = "/media/cdrom"
+    tmp = "tmp."      # prefix for temporary files
+    tmp_fifo="tmp."  # prefix for fifos (local filesystem)
     if os.uname()[1] == "ramanujan":
         mplayer = "/home/richard/sys/MPlayer-1.0rc1/mplayer"
         mencoder = "/home/richard/sys/MPlayer-1.0rc1/mencoder"
+        #mencoder = "/home/richard/sys/mplayer-export-2010-10-21/mencoder"
+        mplayer = "/home/richard/sys/mplayer/mplayer"
+        mencoder = "/home/richard/sys/mplayer/mencoder"
         x264 = "/home/richard/sys/x264/x264"
         if os.getcwd().startswith('/mnt/lithium'):
             tmp_fifo = "/home/richard/tmp/"
     if os.uname()[1] == "pyke":
         x264 = "/home/richard/sys/x264/x264"
-        tmp_fifo = "/home/richard/tmp/"
+        if os.getcwd().startswith('/home/richard/mnt'):
+            tmp_fifo = "/home/richard/tmp/"
     if os.uname()[1] == "ehrenfest":
         mplayer = "/home/richard/sys/MPlayer-1.0rc4/mplayer"
         mencoder = "/home/richard/sys/MPlayer-1.0rc4/mencoder"
         #x264 = "/home/richard/sys/x264/x264"
         dvddev = '/dev/sr0'
-
-    tmp = "tmp."      # prefix for temporary files
-    #tmp_fifo="/tmp"  # prefix for fifos (local filesystem)
 
     input = None  # overrides automatic input (.vob) file name
     vf = None  # String for mencoder video filter (for example, cropping)
@@ -256,7 +260,7 @@ class Film(Config, object):
         return self.f_basename+(".video%s%s"%(self.qualitytag,self.extravname))
     @property
     def f_video_fifo(self):
-        return self.tmp_fifo_auto+self.f_videobasename+".fifo"
+        return self.tmp_fifo_auto+self.f_videobasename.replace(',','')+".fifo"
     @property
     def f_video_final(self):
         return self.tmp+self.f_videobasename+".mkv"
@@ -831,7 +835,7 @@ class Film(Config, object):
 
         mencoder = self.get_videocommand(self.f_video_fifo, type='yuv4mpeg')
 
-        ffmpeg = ['ffmpeg',
+        ffmpeg = [self.ffmpeg,
                   #'ffmpeg2theora',
                   "-s", self.xysize,
                   "-f", 'yuv4mpegpipe', "-i", self.f_video_fifo,
