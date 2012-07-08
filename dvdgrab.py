@@ -16,6 +16,7 @@ Telecine:
 - http://en.wikipedia.org/wiki/Telecine
 - The best way to fix telecined or mixed telecined + progressive is:
   fps = '24000/1001'
+
   vf = 'pullup,softskip,harddup'
 
 Coding standards:
@@ -149,8 +150,8 @@ class Config(object):
         mplayer = "/home/richard/sys/MPlayer-1.0rc1/mplayer"
         mencoder = "/home/richard/sys/MPlayer-1.0rc1/mencoder"
         #mencoder = "/home/richard/sys/mplayer-export-2010-10-21/mencoder"
-        mplayer = "/home/richard/sys/mplayer/mplayer"
-        mencoder = "/home/richard/sys/mplayer/mencoder"
+        #mplayer = "/home/richard/sys/mplayer/mplayer"
+        #mencoder = "/home/richard/sys/mplayer/mencoder"
         x264 = "/home/richard/sys/x264/x264"
         if os.getcwd().startswith('/mnt/lithium'):
             tmp_fifo = "/home/richard/tmp/"
@@ -672,6 +673,7 @@ class Film(Config, object):
                 "--threads", str(self.threads),
                 #"--psnr",
                 #"--verbose",
+                "--input-csp=i420",
                 self.f_video_fifo]
         x264[1:1] = listify(self.x264opts)
 
@@ -748,9 +750,8 @@ class Film(Config, object):
                    "-quiet", "-sid", "2999", # dummy sid to disable them.
                    "-oac", "copy", "-ovc", "raw", "-of", "rawvideo",
                    "-ofps", self.fps,
-                   "-o", self.f_video_fifo,
+                   "-o", out,
                    #-vf crop=720:464:0:6,scale=704:384,dsize=-1,format=I420
-                   "-quiet",
                    self.f_input]
         elif type == 'yuv4mpeg':
             cmd = [self.mplayer,
@@ -774,6 +775,7 @@ class Film(Config, object):
         if self.rescale:
             vf.append('scale=%s'%(self.xysize.replace('x',':')))
         vf.append("dsize=-1") # output encoding
+        vf.append("format=I420")
         cmd[1:1] = ["-vf", ",".join(vf)]
         # other options
         cmd[1:1] = listify(self.mencoderopts)
@@ -796,7 +798,7 @@ class Film(Config, object):
         ffmpeg = ['ffmpeg',
                   #'ffmpeg2theora',
                   "-s", self.xysize,
-                  "-threads", str(self.threads),
+                  "-threads", str(self.threads) if self.threads != 'auto' else "2",
                   #"-target", "",
                   # -sameq is very large, -qscale=1 == -sameq, -qscale=2 ~= 3
                   # -qscale=3 is about 1/2 as big, but noticable metablocking.
@@ -849,7 +851,7 @@ class Film(Config, object):
                   #'-aq', '',
                   '-ab', '192k',
                   #"-f", 'rawvideo', "-i", self.f_video_fifo,
-                  "-map", "0.0", "-map", "1.2",
+                  "-map", "0.0", "-map", "1.1:1.0", #'-vsync', '0',
                   "-r", self.fps,
                   '-vcodec', 'mpeg4',
                   "-acodec", "mp2",
