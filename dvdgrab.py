@@ -31,6 +31,7 @@ Utility programs:
 
 
 from ast import literal_eval
+import collections
 import os
 import cPickle as pickle
 import logging
@@ -135,6 +136,7 @@ class Config(object):
     dry_run = False
     extravname = ""    # Extra tag to add on to temporary video filenames.
     extraoutname = ""    # Extra tag to add on to final file
+    srtSubtitlesDirname = None
 
     # Program locations
     mplayer = "mplayer"
@@ -912,6 +914,64 @@ class Film(Config, object):
 
 
 
+    def _best_sub(self, fnames):
+        if len(fnames) == 1: return fnames[0]
+        # exclude .sub
+        new = [ f for f in fnames if not re.search('.sub$', f) ]
+        if new:  fnames = new
+
+        if len(fnames) == 1: return fnames[0]
+        # include ones with DVD
+        new = [ f for f in fnames if 'DVD' in f.upper() ]
+        if new:  fnames = new
+
+        if len(fnames) == 1: return fnames[0]
+        # exclude ones with HDTV
+        new = [ f for f in fnames if 'HDTV' not in f.upper() ]
+        if new:  fnames = new
+
+        if len(fnames) == 1: return fnames[0]
+        raise Exception("Too many remaining subs: "+' '.join(fnames))
+    def do_srtsubs(self):
+        """Return a list of (lang, fname) for srt subtitles.
+
+        Must have parameter self.srtSubsDirname set."""
+        if not self.srtSubsDirname:
+            return None
+        fnames = os.listdir(self.srtSubsDirname)
+        mre = re.compile(r'\b%d[x.]0?%s\b'%(self.season, self.episode))
+        langre = re.compile(r'\.(?P<lang>\w+)\.(?P<ext>\w+)$')
+        fnames = [x for x in fnames if mre.search(x) ]
+        langs = collections.defaultdict(list)
+        for f in fnames:
+            m = langre.search(f)
+            lang, ext = m.groups()
+            langs[lang].append(f)
+        print self.SxEid
+        _langs = { }
+        for lang, fnames in sorted(langs.iteritems()):
+            f = self._best_sub(fnames)
+            _langs[lang] = os.path.join(self.srtSubsDirname, f)
+            #print f
+            m = langre.search(f)
+            print " ",
+            if m: print m.group('lang'), m.group('ext'),
+            print f
+        langs = _langs
+
+        srtsubs = [ ]
+        for lang in ('en', 'es', 'fr'):
+            if lang in langs:
+                srtsubs.append((lang, langs[lang]))
+                del langs[lang]
+        srtsubs.extend(
+            (lang, langs[lang])
+            for lang, f in sorted(langs.iteritems())
+            )
+        return srtsubs
+
+
+
     #@asneeded('(self.f_final, )',
     #          '(self.f_audio_final(i) for i in self.audio.keys())'
     #          '+ (self.f_video_final)'
@@ -922,7 +982,8 @@ class Film(Config, object):
         # Metadata part
         mkvmerge = ["mkvmerge",
                     "--default-duration", self.fps.replace("/",':')+'fps',
-                    "--title",  self.title]
+                    "--title",  self.title,
+                    ]
         if os.access(self.f_chapters, os.F_OK):
             mkvmerge.extend(("--chapters", self.f_chapters))
         # Video part
@@ -939,6 +1000,11 @@ class Film(Config, object):
             y[0:0] = ["--language", "0:"+lang]
             mkvmerge.extend(y)
 
+        # srt subtitles
+        if getattr(self, 'srtSubsDirname', None):
+            for sublang, subfile in self.do_srtsubs():
+                mkvmerge.extend(('--language', '0:%s'%sublang, subfile))
+
         # Subtitles
         for sid, lang in sorted(self.subtitles.items()):
             #mkvmerge.extend([ self.f_sub(sid) ])
@@ -948,7 +1014,9 @@ class Film(Config, object):
         mkvmerge.extend(["-o", self.f_output])
         print_cmd(mkvmerge)
         if not self.dry_run:
-            call(mkvmerge)
+            ret = call(mkvmerge)
+            if ret not in (0, 1):
+                raw_input('(Cmd failed %d)>>> '%ret)
 
 
 class Episode(Film):
