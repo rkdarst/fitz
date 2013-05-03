@@ -1,3 +1,6 @@
+"""Provides tracing functions for code executions.
+"""
+
 import sys
 
 import inspect
@@ -8,6 +11,8 @@ import os.path
 # executes
 traceLine = False
 useColor = True
+traceModules = None
+
 
 def color(s):
     if useColor:
@@ -27,7 +32,9 @@ def traceit(frame, event, arg):
     #if f[4] is None: return traceit
     #filename = f[1]
 
-    modname = modname = frame.f_globals.get('__name__', '__name__=unknown')
+    modname = frame.f_globals.get('__name__', '__name__=unknown')
+    if traceModules and modname not in traceModules:
+        return traceit
     funcname = frame.f_code.co_name  # f[3]
     filename = frame.f_globals.get('__file__', '__file__=unknown')
     lineno = frame.f_lineno #f[2]
@@ -97,6 +104,9 @@ if __name__ == "__main__":
         elif sys.argv[1] == '-a':
             traceLine = True
             del sys.argv[1]
+        elif sys.argv[1] == '-l':
+            traceModules = sys.argv[2].split(',')
+            del sys.argv[1:3]
         else:
             break
     if len(sys.argv) == 1:

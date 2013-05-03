@@ -2,8 +2,24 @@
 
 """Improved code.interact()
 
+Can take globals argument.  Can automatically find locals and globals
+based on the stack - by default gets them from one stack frame up.
+Suggested uses:
 
+In Python, interact now:
+  import fitz.interact ; interact.interact()
 
+In Python, interact now.  This only works once, since the module is
+only imported once:
+  import fitz.interactnow
+
+In Python, go into interact mode at a traceback.
+  import fitz.interacttb
+
+Run from command line and drop into PDB upon each traceback:
+  python -m fitz.pdbtb
+... or enable it from python:
+  import fitz.pdbtb ; pdbtb.enable()
 """
 
 import code
@@ -17,27 +33,37 @@ import sys
 import readline
 import rlcompleter
 readline.parse_and_bind("tab: complete")
-        
+
 scrollback = 20
 line_continuers = (",", "\\")
 tab = "        "
 
-def interact(banner="", local=None, stackLevel=1):
+def interact(banner="", local=None, stackLevel=1, frame=None):
     """Interact using the current global and local scope and history.
 
     arguments:
     banner -- print this text before interacting.
     local -- ignored
+
+
     """
     if len(banner) > 0:
         print banner
     # Get data from calling frame
-    calling_data = inspect.stack()[stackLevel]
-    #print calling_data
-    filename = calling_data[1]
-    lineno   = calling_data[2]
-    local = calling_data[0].f_locals
-    global_ = calling_data[0].f_globals
+    #calling_data = inspect.stack()[stackLevel]
+    #filename = calling_data[1]
+    #lineno   = calling_data[2]
+    #frame = calling_data[0]
+    #local = frame.f_locals
+    #global_ = frame.f_globals
+
+    if frame is None:
+        frame = inspect.stack()[stackLevel][0]
+    filename = frame.f_code.co_filename
+    lineno = frame.f_lineno
+    local = frame.f_locals
+    global_ = frame.f_globals
+
 
     new_history = [ ]
     if os.access(filename, os.R_OK):
@@ -153,7 +179,7 @@ def interact2(banner=None, readfunc=None, local=None, global_=None):
         except ImportError:
             pass
     console.interact(banner)
-                                                        
+
 
 
 if __name__ == "__main__":
@@ -165,7 +191,7 @@ if __name__ == "__main__":
                   2)
     null_function(1, 2 +
                   2)
-    null_function(1, 
+    null_function(1,
                   2)
     interact()
 
