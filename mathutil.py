@@ -34,7 +34,7 @@ def chooseNEnumerate(objs, number=1):
     for i, obj in enumerate(objs):
         otherobjs = objs[:i] + objs[i+1:]
         #print " current", obj, otherobjs
-        for conditional_selections in permuteNEnumerate(otherobjs, number-1):
+        for conditional_selections in chooseNEnumerate(otherobjs, number-1):
             #print " others", conditional_selections
             yield ( obj, ) + conditional_selections
 
@@ -130,6 +130,55 @@ class Averager(object):
         """Sample Standard Deviation"""
         if self.n <= 1: return float('nan')
         return self.M2 / (self.n-1)
+    def proxy(self, expr):
+        class X:
+            def __init__(self, main, expr):
+                self.main = main
+                self.expr = expr
+            def add(self, x): pass
+            @property
+            def mean(self):
+                return eval(self.expr, dict(o=self.main))
+        return X(main=self, expr=expr)
+
+class AutoAverager(object):
+    def __init__(self, datatype=float, newAverager=Averager,
+                 depth=1):
+        """
+        if depth=1, then self[name] will be an Averager
+        if depth=2, then self[name] will be AutoAverager...
+                  ...and self[name2] will be an Averager
+        and so on.
+
+        newAverager is what the leaf averager object will be created
+        with.  This should be replaced with AutoAverager.
+        """
+        self.datatype = datatype
+        self.depth = depth
+        self.newAverager = newAverager
+        self.order = [ ]
+        self.data = { }
+        self.data_list = [ ]
+    def __getitem__(self, name, newAverager=None):
+        if name not in self.data:
+            if self.depth > 1:
+                new = self.__class__(datatype=self.datatype,
+                                     newAverager=self.newAverager,
+                                     depth=self.depth-1,
+                                     )
+            else:
+                if newAverager is not None:
+                    new = newAverager()
+                else:
+                    new = self.newAverager(datatype=self.datatype)
+            self.order.append(name)
+            self.data[name] = new
+            self.data_list.append(new)
+        return self.data[name]
+    get = __getitem__
+    def __iter__(self):
+        for key in self.order:
+            return (key, self.data[key])
 
 def _test_Averager():
     import random

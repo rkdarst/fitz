@@ -21,6 +21,9 @@ See below for examples.
 import sys
 
 def get_cliargs(argv=None, multiopt=False, allowedargs=None):
+    """Parse cli arguments.
+
+    Returns (args, options)"""
     if argv is None:
         argv = sys.argv
     if type(argv) == str:
