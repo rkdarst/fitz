@@ -161,11 +161,11 @@ class Config(object):
         x264 = "/home/richard/sys/x264/x264"
         if os.getcwd().startswith('/home/richard/mnt'):
             tmp_fifo = "/home/richard/tmp/"
-    if os.uname()[1] == "ehrenfest":
-        mplayer = "/home/richard/sys/MPlayer-1.0rc4/mplayer"
-        mencoder = "/home/richard/sys/MPlayer-1.0rc4/mencoder"
-        #x264 = "/home/richard/sys/x264/x264"
-        dvddev = '/dev/sr0'
+    #if os.uname()[1] == "ehrenfest":
+    #    mplayer = "/home/richard/sys/MPlayer-1.0rc4/mplayer"
+    #    mencoder = "/home/richard/sys/MPlayer-1.0rc4/mencoder"
+    #    #x264 = "/home/richard/sys/x264/x264"
+    #    dvddev = '/dev/sr0'
 
     input = None  # overrides automatic input (.vob) file name
     vf = None  # String for mencoder video filter (for example, cropping)
