@@ -35,16 +35,22 @@ commonWords = set(('',))
 
 class Person(object):
     #recentWords = ('', '')
-    split_func = re.compile(r'\s+').split
-    join_char = " "
-    recentWords = ('', '', '', '', '')
     #recentWords = '\0\0\0\0\0'
     #split_func = lambda self, x: (y for y in x)
     #join_char = ""
-    def __init__(self, nick):
+    def __init__(self, nick, mode='words', memory=1):
         self.nick = nick
         self.wordCounts = { }
         self.markovArray = { }
+        if mode == 'words':
+            self.split_func = re.compile(r'\s+').split
+            self.join_char = " "
+            self.recentWords = ('', ) * memory
+        else:
+            self.recentWords = '\0' * memory
+            self.split_func = lambda self, x: (y for y in x)
+            self.join_char = ""
+            
     def __iadd__(self, (line, ) ):
         recentWords = self.recentWords
         if len(line) < 15 or 'http://' in line or 'UghBot' in line:
@@ -124,8 +130,8 @@ class Person(object):
                     break
             sentence.append(next)
             debugsentence.append(next+countdata)
-            #recentWords = recentWords[1:] + (next, )
-            recentWords = recentWords[1:] + next
+            recentWords = recentWords[1:] + (next, )
+            #recentWords = recentWords[1:] + next
             #recentWords = recentWords[1:] + (hash(next), )
 
             if length:
@@ -162,7 +168,7 @@ def loadChannel(f, nicks=None, storage=None):
         lowernick = nick.lower()
 
         lines[sanitize_word(line.lower())] += 1
-        continue
+        #continue
 
         if nicks and lowernick not in nicks:
             continue
@@ -206,7 +212,7 @@ def topDigraphs(person):
 
 
 if __name__ == "__main__":
-    debug = True
+    #debug = True
     AllNicks = loadChannel(open(sys.argv[1]))
     #allsent = [ ]
     #for i in range(20):
@@ -222,7 +228,7 @@ if __name__ == "__main__":
                        AllNicks['mssnowflake'],
                        AllNicks['hydroxide'],
                        ), number=5000)
-    if True:
+    if False:
         items = sorted(((v,k) for k,v in lines.iteritems() if v>1),
                           reverse=True)
         print "total lines duplicated:", sum(v for v,k in items)
@@ -234,6 +240,10 @@ if __name__ == "__main__":
         for v,k in items:
             print "%3d"%v, k
 
+    if True:
+        nick = sys.argv[2]
+        for i in range(1000):
+            print AllNicks[nick].genSentence(length=15)
 
 #printTopWords((AllNicks['MrBeige'],
 #               AllNicks['Hydroxide'],
