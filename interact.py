@@ -38,12 +38,17 @@ scrollback = 20
 line_continuers = (",", "\\")
 tab = "        "
 
-def interact(banner="", local=None, stackLevel=1, frame=None):
+def interact(banner="", local=None, stackLevel=1, frame=None,
+             mode='interact', history=False):
     """Interact using the current global and local scope and history.
 
     arguments:
     banner -- print this text before interacting.
     local -- ignored
+    history: bool or int
+        if non-false, this many lines of history are found from the
+        file being interacted with and inserted into the readline
+        buffer
 
 
     """
@@ -65,17 +70,35 @@ def interact(banner="", local=None, stackLevel=1, frame=None):
     global_ = frame.f_globals
 
 
-    new_history = [ ]
-    if os.access(filename, os.R_OK):
-        new_history.extend(get_history(filename, lineno))
-    # add lines to history, removing proper amount of whitespace
-    for line in new_history:
-        readline.add_history(line)
+    if history:
+        new_history = [ ]
+        if os.access(filename, os.R_OK):
+            new_history.extend(get_history(filename, lineno))
+        # add lines to history, removing proper amount of whitespace
+        for line in new_history:
+            readline.add_history(line)
 
     # add an exit() function under the name __exit.  Hopefully this
     # won't cause namespace collisions!
     local["__exit"] = sys.exit
-    interact2(local=local, global_=global_, banner="")
+    if mode == 'pdb':
+        import pdb
+        p = pdb.Pdb()
+        def do_quit(self, arg):
+            sys.exit()
+        p.do_quit = type(p.do_quit)(do_quit, p, pdb.Pdb)
+        p.do_q = p.do_quit
+        p.reset()
+        p.interaction(frame, None)
+        #from fitz import interactnow
+        #pdb.post_mortem(frame)
+    else:
+        interact2(local=local, global_=global_, banner="")
+
+def pdb(*args, **kwargs):
+    return interact(*args, mode='pdb',
+                    stackLevel=kwargs.pop('stackLevel', 1)+1,
+                    **kwargs)
 
 def get_history(filename, lineno):
     # get lines
