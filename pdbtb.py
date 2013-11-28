@@ -32,7 +32,7 @@ def run_ipython(func, *args, **kwargs):
     try:
         func(*args, **kwargs)
     except Exception as e:
-        #t, value, tb = sys.exc_info()
+        t, value, tb = sys.exc_info()
         sys.__excepthook__(t, value, tb)
         frame = sys.exc_info()[2]
         #tb = e.tb_frame
