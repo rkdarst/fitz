@@ -18,17 +18,17 @@ def disable():
     """Disable exception hook."""
     sys.excepthook = sys.__excepthook__
 
-def run(func, *args, **kwargs):
-    """Run a function with pdb exception hook enabled."""
+def _run(func, *args, **kwargs):
+    """Call .enable() and then run function."""
     enable()
     func(*args, **kwargs)
 
-def run_ipython(func, *args, **kwargs):
-    """ipython pdb hook: invokes pdb on exceptions in ipython.
+def run(func, *args, **kwargs):
+    """pdb hook: invokes pdb on exceptions in python.
 
     The function func is called, with arguments args and
     kwargs=kwargs.  If this func raises an exception, pdb is invoked
-    on that frame.  Upon exit from pdb, return to ipython normally."""
+    on that frame.  Upon exit from pdb, return to python normally."""
     try:
         func(*args, **kwargs)
     except Exception as e:
@@ -38,6 +38,7 @@ def run_ipython(func, *args, **kwargs):
         #tb = e.tb_frame
         pdb.post_mortem(tb)
         del frame   # the docs warn to avoid circular references.
+run_ipython = run
 
 def now(frame=None, stackLevel=1):
     """Run pdb in the calling frame."""
@@ -45,6 +46,8 @@ def now(frame=None, stackLevel=1):
         frame = inspect.stack()[stackLevel][0]
     p = pdb.Pdb()
     def do_quit(self, arg):
+        # This raises SystemExit which escapes from pdb and returns to
+        # normal execution.
         sys.exit()
     p.do_quit = type(p.do_quit)(do_quit, p, pdb.Pdb)
     p.do_q = p.do_quit
