@@ -30,7 +30,7 @@ def run(func, *args, **kwargs):
     kwargs=kwargs.  If this func raises an exception, pdb is invoked
     on that frame.  Upon exit from pdb, return to python normally."""
     try:
-        func(*args, **kwargs)
+        return func(*args, **kwargs)
     except Exception as e:
         t, value, tb = sys.exc_info()
         sys.__excepthook__(t, value, tb)
