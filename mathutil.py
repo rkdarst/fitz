@@ -112,38 +112,47 @@ class Averager(object):
         return self._M2
     @property
     def std(self):
-        """Population Variance"""
+        """Population standard deviation"""
         if self.n == 0: return float('nan')
         return math.sqrt(self.M2 / self.n)
     @property
     def stdsample(self):
-        """Sample Variance"""
+        """Sample standard deviation"""
         if self.n <= 1: return float('nan')
         return math.sqrt(self.M2 / (self.n-1))
     @property
+    def stdmean(self):
+        """(Sample) standard deviation of the mean.  std / sqrt(n)"""
+        if self.n <= 1: return float('nan')
+        return math.sqrt(self.M2 / ((self.n-1)*self.n))
+    @property
     def var(self):
-        """Population Standard Deviation"""
+        """Population variance"""
         if self.n == 0: return float('nan')
         return self.M2 / self.n
     @property
     def varsample(self):
-        """Sample Standard Deviation"""
+        """Sample variance"""
         if self.n <= 1: return float('nan')
         return self.M2 / (self.n-1)
     def proxy(self, expr):
-        class X:
-            def __init__(self, main, expr):
-                self.main = main
-                self.expr = expr
-            def add(self, x): pass
-            @property
-            def mean(self):
-                return eval(self.expr, dict(o=self.main))
-        return X(main=self, expr=expr)
+        """Proxy for computing other"""
+        return _AvgProxy(main=self, expr=expr)
+    def proxygen(self, expr):
+        return lambda: self.proxy(expr=expr)
+class _AvgProxy(object):
+    def __init__(self, main, expr):
+        self.main = main
+        self.expr = expr
+    def add(self, x):
+        raise "You can't add values to proxy objects"
+    @property
+    def mean(self):
+        return eval(self.expr, dict(o=self.main))
 
 class AutoAverager(object):
     def __init__(self, datatype=float, newAverager=Averager,
-                 depth=1):
+                 depth=1, auto_proxy=[]):
         """
         if depth=1, then self[name] will be an Averager
         if depth=2, then self[name] will be AutoAverager...
@@ -152,33 +161,79 @@ class AutoAverager(object):
 
         newAverager is what the leaf averager object will be created
         with.  This should be replaced with AutoAverager.
+
+        This will automatically make hierarchical averagers
         """
         self.datatype = datatype
         self.depth = depth
         self.newAverager = newAverager
-        self.order = [ ]
+        self.names = [ ]
         self.data = { }
         self.data_list = [ ]
-    def __getitem__(self, name, newAverager=None):
+        self.auto_proxy = auto_proxy
+    def __getitem__(self, name, newAverager=None, do_proxy=True):
+        # newAverager is used for proxy objects.
         if name not in self.data:
             if self.depth > 1:
                 new = self.__class__(datatype=self.datatype,
                                      newAverager=self.newAverager,
                                      depth=self.depth-1,
+                                     auto_proxy=self.auto_proxy,
                                      )
             else:
                 if newAverager is not None:
                     new = newAverager()
                 else:
                     new = self.newAverager(datatype=self.datatype)
-            self.order.append(name)
+            self.names.append(name)
             self.data[name] = new
             self.data_list.append(new)
+            # Add auto-proxies (e.g. computing std dev?)
+            if self.depth == 1 and not isinstance(new, _AvgProxy) and do_proxy:
+                for suffix, expr in self.auto_proxy:
+                    self.add_proxy(name, name+suffix, expr=expr)
         return self.data[name]
     get = __getitem__
+    def add(self, name, val, do_proxy=True):
+        self.get(name, do_proxy=do_proxy).add(val)
+    def remove(self, name_or_index):
+        if isinstance(name_or_index, int):
+            name = self.names[-1]
+            del self.data[name]
+            del self.names[-1]
+        else:
+            del self.data[name]
+            self.names.remove(name)
     def __iter__(self):
-        for key in self.order:
+        for key in self.names:
             return (key, self.data[key])
+    def add_proxy(self, name_orig, name_new, expr):
+        """Add a proxy object.
+
+        Example usage to add a standard deviation column:
+        .add_proxy('q', 'q_std', 'o.stdmean')"""
+        if name_new not in self.data:
+            self.get(name_new, newAverager=self[name_orig].proxygen(expr))
+    def column(self, name, attrname='mean'):
+        assert self.depth == 2
+        return [getattr(self.data[name_][name], attrname) for name_ in self.names]
+    def column_names(self):
+        return self.data[self.names[0]].names
+    def table(self, attrname='mean'):
+        assert self.depth == 2
+        return zip(*(self.column(name, attrname=attrname)
+                     for name in self.column_names()))
+class _DerivProxy(_AvgProxy):
+    def __init__(self, main, name, t):
+        self.main = main
+    def add(self, x):
+        raise "You can't add values to proxy objects"
+    @property
+    def mean(self):
+        idx = main.names.index(t)
+        if idx == 0 or idx == len(main.names)-1:
+            return float('nan')
+        return (main[t+1][name].mean-main[t-1][name].mean)/2.
 
 def _test_Averager():
     import random
