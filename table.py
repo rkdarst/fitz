@@ -3,6 +3,7 @@
 import collections
 import re
 import sys
+import time
 
 class TablePrinter(object):
     def __init__(self):
@@ -15,7 +16,7 @@ class TablePrinter(object):
         print >> fout
 
 
-def write_table(fobj, table, headers=None, labels=None):
+def write_table(fobj, table, headers=[], labels=None):
     for line in headers:
         print >> fobj, "#", headerline
     print >> fobj, "#", time.ctime()
